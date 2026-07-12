@@ -1,0 +1,60 @@
+<section class="task-tracker">
+  <h1>Task Tracker</h1>
+
+  @if (error()) {
+    <div class="banner banner-error">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="load()">Retry</button>
+    </div>
+  }
+
+  <form class="add-form" (ngSubmit)="addTask()">
+    <input
+      name="title"
+      type="text"
+      placeholder="Title"
+      [(ngModel)]="newTitle"
+      required
+    />
+    <input
+      name="description"
+      type="text"
+      placeholder="Description (optional)"
+      [(ngModel)]="newDescription"
+    />
+    <input name="dueDate" type="date" [(ngModel)]="newDueDate" />
+    <button type="submit" [disabled]="!newTitle.trim()">Add task</button>
+  </form>
+
+  @if (loading()) {
+    <p class="status">Loading tasks…</p>
+  } @else if (tasks().length === 0) {
+    <p class="status">No tasks yet — add one above.</p>
+  } @else {
+    <ul class="task-list">
+      @for (task of tasks(); track task.id) {
+        <li class="task" [class.done]="task.isDone">
+          <label class="task-main">
+            <input
+              type="checkbox"
+              [checked]="task.isDone"
+              (change)="toggleDone(task)"
+            />
+            <div class="task-text">
+              <span class="task-title">{{ task.title }}</span>
+              @if (task.description) {
+                <span class="task-description">{{ task.description }}</span>
+              }
+              @if (task.dueDate) {
+                <span class="task-due">Due {{ task.dueDate | date: 'mediumDate' }}</span>
+              }
+            </div>
+          </label>
+          <button type="button" class="delete-btn" (click)="removeTask(task)" aria-label="Delete task">
+            ✕
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>
