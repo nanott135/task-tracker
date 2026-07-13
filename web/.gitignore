@@ -29,6 +29,9 @@ yarn-error.log
 !.vscode/mcp.json
 .history/*
 
+# Local HTTPS dev certificate (exported per-machine via dotnet dev-certs)
+/.cert
+
 # Miscellaneous
 /.angular/cache
 .sass-cache/
