@@ -8,14 +8,21 @@
     </div>
   }
 
-  <form class="add-form" (ngSubmit)="addTask()">
-    <input
-      name="title"
-      type="text"
-      placeholder="Title"
-      [(ngModel)]="newTitle"
-      required
-    />
+  <form class="add-form" (ngSubmit)="addTask()" novalidate>
+    <div class="field">
+      <input
+        name="title"
+        type="text"
+        placeholder="Title"
+        [(ngModel)]="newTitle"
+        (ngModelChange)="onTitleInput()"
+        [class.invalid]="titleError()"
+        aria-describedby="title-error"
+      />
+      @if (titleError()) {
+        <span id="title-error" class="field-error">{{ titleError() }}</span>
+      }
+    </div>
     <input
       name="description"
       type="text"
@@ -23,7 +30,7 @@
       [(ngModel)]="newDescription"
     />
     <input name="dueDate" type="date" [(ngModel)]="newDueDate" />
-    <button type="submit" [disabled]="!newTitle.trim()">Add task</button>
+    <button type="submit">Add task</button>
   </form>
 
   @if (loading()) {

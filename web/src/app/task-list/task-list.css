@@ -45,6 +45,27 @@ h1 {
   flex: 1 1 160px;
 }
 
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 160px;
+}
+
+.field input[type='text'] {
+  flex: none;
+  width: 100%;
+}
+
+.field input.invalid {
+  border-color: #d32f2f;
+}
+
+.field-error {
+  color: #d32f2f;
+  font-size: 0.8rem;
+}
+
 .add-form input,
 .add-form button {
   padding: 0.5rem 0.75rem;
@@ -157,6 +178,7 @@ h1 {
 
   .add-form input,
   .add-form input[type='text'],
+  .add-form .field,
   .add-form button {
     flex: none;
     width: 100%;
