@@ -17,6 +17,7 @@ export class TaskList implements OnInit {
   readonly tasks = signal<Task[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly titleError = signal<string | null>(null);
 
   newTitle = '';
   newDescription = '';
@@ -43,7 +44,11 @@ export class TaskList implements OnInit {
 
   addTask(): void {
     const title = this.newTitle.trim();
-    if (!title) return;
+    if (!title) {
+      this.titleError.set('Title is required.');
+      return;
+    }
+    this.titleError.set(null);
 
     this.taskService
       .create({
@@ -61,6 +66,12 @@ export class TaskList implements OnInit {
         },
         error: () => this.error.set('Could not add the task. Please try again.'),
       });
+  }
+
+  onTitleInput(): void {
+    if (this.titleError() && this.newTitle.trim()) {
+      this.titleError.set(null);
+    }
   }
 
   toggleDone(task: Task): void {

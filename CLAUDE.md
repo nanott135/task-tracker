@@ -61,6 +61,26 @@ cd api
 dotnet run
 ```
 
+Runs on `http://localhost:5189` by default (the `http` launch profile — this
+is also what the Angular dev proxy expects). Use
+`dotnet run --launch-profile https` only if you need TLS directly
+(`https://localhost:7062`); that profile forces HTTP→HTTPS redirects, which
+breaks the Angular proxy, so use the default `http` profile when running the
+API and the Angular dev server together. The `https` profile needs a
+trusted dev cert once per machine: `dotnet dev-certs https --trust`.
+
+Swagger UI (Development only): `http://localhost:5189/swagger/index.html`.
+
+### API tests
+
+```
+cd api
+dotnet test
+```
+
+Runs the xUnit suite in `TaskTracker.Api.Tests` against an EF Core
+in-memory database — no SQL Server instance required.
+
 ### Web
 
 ```
@@ -69,5 +89,16 @@ npm install
 ng serve
 ```
 
-Runs at `http://localhost:4200` and calls the API (configure the API base URL
-in the Angular environment files).
+Runs at `http://localhost:4200`. The dev server proxies `/api/*` requests to
+the API at `http://localhost:5189` (see `proxy.conf.json`), so the Angular
+environment files just set `apiUrl: '/api'` — no host/port to configure
+there.
+
+### Web tests
+
+```
+cd web
+ng test
+```
+
+Runs the Vitest suite (components and `TaskService`).
