@@ -1,0 +1,31 @@
+# .NET
+[Bb]in/
+[Oo]bj/
+*.user
+
+# Web (Angular / Node)
+node_modules/
+dist/
+.angular/
+npm-debug.log*
+
+# Dev HTTPS cert (web/.cert/, gitignored per CLAUDE.md)
+web/.cert/
+*.pem
+*.key
+
+# Secrets
+appsettings.Development.json
+appsettings.*.local.json
+.env
+.env.*
+
+# Editors / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
