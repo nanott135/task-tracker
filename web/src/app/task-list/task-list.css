@@ -1,0 +1,164 @@
+.task-tracker {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.banner-error {
+  background: #fdecea;
+  color: #611a15;
+  border: 1px solid #f5c6cb;
+}
+
+.banner-error button {
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  border-radius: 6px;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+}
+
+.add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.add-form input[type='text'] {
+  flex: 1 1 160px;
+}
+
+.add-form input,
+.add-form button {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.add-form button {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.add-form button:disabled {
+  background: #9db8e8;
+  border-color: #9db8e8;
+  cursor: not-allowed;
+}
+
+.status {
+  color: #666;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.task {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.task.done .task-title {
+  text-decoration: line-through;
+  color: #888;
+}
+
+.task-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-main input[type='checkbox'] {
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+}
+
+.task-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.task-title {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.task-description {
+  color: #555;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.task-due {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.25rem;
+  flex-shrink: 0;
+}
+
+.delete-btn:hover {
+  color: #d32f2f;
+}
+
+@media (max-width: 480px) {
+  .add-form {
+    flex-direction: column;
+  }
+
+  .add-form input,
+  .add-form input[type='text'],
+  .add-form button {
+    flex: none;
+    width: 100%;
+  }
+}
