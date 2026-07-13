@@ -15,7 +15,8 @@ Full-stack task tracker: .NET Web API backend, Angular frontend, SQL Server data
 
 - EF Core, code-first with migrations. Model changes go through
   `dotnet ef migrations add <Name>` — never hand-edit the database schema.
-- Enable CORS for the Angular dev server origin `http://localhost:4200`.
+- Enable CORS for the Angular dev server origin (`http://localhost:4200`
+  and `https://localhost:4200`).
 - Controllers return DTOs, never EF entities directly (avoids leaking tracking
   state / over-posting, keeps the wire contract stable if the entity changes).
 
@@ -89,10 +90,23 @@ npm install
 ng serve
 ```
 
-Runs at `http://localhost:4200`. The dev server proxies `/api/*` requests to
-the API at `http://localhost:5189` (see `proxy.conf.json`), so the Angular
-environment files just set `apiUrl: '/api'` — no host/port to configure
-there.
+Runs at `https://localhost:4200` (HTTPS by default — see `angular.json`'s
+`serve.options`). The dev server proxies `/api/*` requests to the API at
+`http://localhost:5189` (see `proxy.conf.json`), so the Angular environment
+files just set `apiUrl: '/api'` — no host/port to configure there.
+
+The HTTPS cert/key aren't committed (`web/.cert/`, gitignored) — export the
+same trusted ASP.NET Core dev cert once per machine so the browser trusts
+`https://localhost:4200` without a warning:
+
+```
+cd web
+mkdir .cert
+dotnet dev-certs https --export-path .cert/localhost.pem --format Pem --no-password
+```
+
+(Produces `.cert/localhost.pem` and `.cert/localhost.key`, matching the
+paths already configured in `angular.json`.)
 
 ### Web tests
 
