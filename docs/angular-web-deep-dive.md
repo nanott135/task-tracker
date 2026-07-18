@@ -141,7 +141,7 @@ one level down.
 
 ## 3. Dependency Injection — `@Injectable` and `inject()`
 
-This is the part that tripped up the "I don't know" answers earlier, so
+This is one of the trickier parts of Angular's mental model, so
 let's be very explicit.
 
 **`src/app/services/task.service.ts`:**
