@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Weekend Claude Code Bootcamp — GitHub or Azure DevOps</title>
+<style>
+  @page {
+    size: Letter;
+    margin: 22mm 18mm 20mm 18mm;
+    @bottom-center {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      font-size: 8pt;
+      color: #8a8f98;
+    }
+    @bottom-right {
+      content: "The Weekend Claude Code Bootcamp";
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      font-size: 8pt;
+      color: #8a8f98;
+    }
+  }
+  @page :first { @bottom-center { content: ""; } @bottom-right { content: ""; } }
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10.3pt;
+    line-height: 1.5;
+    color: #23272e;
+    margin: 0;
+  }
+  h1, h2, h3, h4 { font-weight: 700; color: #12161c; line-height: 1.2; }
+  h2 {
+    font-size: 19pt;
+    margin: 0 0 4px 0;
+    padding-bottom: 6px;
+    border-bottom: 3px solid #d9581f;
+    page-break-after: avoid;
+  }
+  h3 { font-size: 13.5pt; margin: 20px 0 6px 0; color: #c2410c; page-break-after: avoid; }
+  h4 { font-size: 11pt; margin: 15px 0 4px 0; color: #1f2937; page-break-after: avoid; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+  a { color: #c2410c; text-decoration: none; }
+  code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 8.8pt;
+    background: #f1f2f4;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #b02a37;
+  }
+  pre {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 8.6pt;
+    line-height: 1.45;
+    background: #1e232b;
+    color: #e6e8eb;
+    padding: 11px 13px;
+    border-radius: 6px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 8px 0;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+  pre.prompt {
+    background: #10261f;
+    border-left: 4px solid #34d399;
+    color: #d7f7e9;
+  }
+  .prompt-label {
+    font-size: 7.5pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0f766e;
+    font-weight: 700;
+    margin: 12px 0 2px 0;
+  }
+  .callout {
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    border-left: 4px solid #ea580c;
+    border-radius: 5px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    page-break-inside: avoid;
+    font-size: 9.7pt;
+  }
+  .callout.tip { background: #eff6ff; border-color: #93c5fd; border-left-color: #2563eb; }
+  .callout.warn { background: #fef2f2; border-color: #fca5a5; border-left-color: #dc2626; }
+  .callout .lbl { font-weight: 700; text-transform: uppercase; font-size: 7.6pt; letter-spacing: 0.06em; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 9.3pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #d5d9df; padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: #f1f2f4; font-weight: 700; }
+  .cover {
+    page-break-after: always;
+    height: 235mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 8mm;
+  }
+  .cover .kicker { color: #d9581f; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; font-size: 10pt; }
+  .cover h1 { font-size: 40pt; margin: 10px 0 6px 0; letter-spacing: -0.5px; }
+  .cover .sub { font-size: 15pt; color: #4b5563; font-weight: 400; margin-bottom: 30px; }
+  .cover .stack { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 30px 0; }
+  .cover .chip { background: #f1f2f4; border: 1px solid #d5d9df; border-radius: 20px; padding: 4px 13px; font-size: 9.5pt; font-weight: 600; color: #374151; }
+  .cover .meta { font-size: 10pt; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 14px; }
+  .toc { page-break-after: always; }
+  .toc h2 { border-color: #d9581f; }
+  .toc ol { list-style: none; padding-left: 0; counter-reset: toc; }
+  .toc > ol > li { counter-increment: toc; font-weight: 700; margin: 9px 0 3px 0; font-size: 11pt; }
+  .toc > ol > li::before { content: counter(toc) ".  "; color: #d9581f; }
+  .toc ul { list-style: none; padding-left: 22px; margin: 2px 0; }
+  .toc ul li { font-weight: 400; font-size: 9.7pt; color: #4b5563; margin: 1px 0; }
+  .part { page-break-before: always; }
+  .lead { font-size: 10.6pt; color: #4b5563; margin-bottom: 4px; }
+  .filetree { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 8.6pt; background:#f7f8f9; border:1px solid #e5e7eb; border-radius:6px; padding:10px 13px; white-space:pre; line-height:1.4; }
+  hr.soft { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+  .opt { border: 1px solid #e0e3e8; border-radius: 6px; padding: 3px 13px 11px; margin: 10px 0; page-break-inside: avoid; }
+  .opt.gh { border-left: 4px solid #6e40c9; background: #faf9fe; }
+  .opt.az { border-left: 4px solid #0078d4; background: #f5faff; }
+  .opt .otag { font-size: 8pt; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 700; margin: 9px 0 3px; }
+  .opt.gh .otag { color: #6e40c9; }
+  .opt.az .otag { color: #0078d4; }
+  .opt p { margin: 5px 0; }
+  .opt pre { margin: 6px 0; }
+  .step { font-weight:700; color:#c2410c; }
+  ol.checks { list-style: none; padding-left: 4px; }
+  ol.checks li::before { content: "\2610  "; color:#d9581f; font-weight:700; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="kicker">A Zero-to-Interview-Ready Guide &middot; GitHub or Azure DevOps edition</div>
+  <h1>The Weekend<br>Claude&nbsp;Code Bootcamp</h1>
+  <div class="sub">Go from a blank Windows machine to shipping a full-stack app &mdash; driving every step with the Claude Code CLI. Use <strong>GitHub</strong> or <strong>Azure DevOps</strong> for your Git host.</div>
+  <div class="stack">
+    <span class="chip">Claude Code CLI</span>
+    <span class="chip">GitHub <em>or</em> Azure DevOps</span>
+    <span class="chip">VS Code</span>
+    <span class="chip">Angular 22</span>
+    <span class="chip">C# / .NET 10 Web API</span>
+    <span class="chip">SQL Server 2025 Express</span>
+    <span class="chip">Model Context Protocol</span>
+  </div>
+  <div class="meta">
+    A hands-on, prompt-by-prompt curriculum you can finish in one weekend.<br>
+    Built for Windows &middot; Experienced developers &middot; Updated July 2026
+  </div>
+</div>
+
+<!-- ============ TOC ============ -->
+<div class="toc">
+  <h2>What you'll do this weekend</h2>
+  <p class="lead">Two builds, one goal: be genuinely fluent in an AI-driven .NET + Angular workflow by Sunday night.</p>
+  <ol>
+    <li>How to use this guide &amp; the weekend schedule
+      <ul><li>The mindset shift &middot; The two-day plan &middot; What "interview-ready" means here</li></ul>
+    </li>
+    <li>Part 1 &mdash; Set up your machine (Sat morning, ~2 hrs)
+      <ul><li>Git host account (GitHub or Azure DevOps) &middot; Git &middot; VS Code &middot; Node.js &middot; Claude Code CLI &middot; First login &middot; The core CLI workflow</li></ul>
+    </li>
+    <li>Part 2 &mdash; Warm-up build: Tic-Tac-Toe (Sat afternoon, ~2&ndash;3 hrs)
+      <ul><li>Repo &amp; clone &middot; CLAUDE.md &middot; Prompt-driven build &middot; Plan mode &middot; Tests &middot; Commit &amp; push</li></ul>
+    </li>
+    <li>Part 3 &mdash; The capstone: full-stack task tracker (Sunday, ~6 hrs)
+      <ul><li>Architecture &middot; Install .NET 10 / SQL Server 2025 / Angular 22 &middot; Database &middot; C# Web API + EF Core &middot; Angular front-end &middot; Wiring it together</li></ul>
+    </li>
+    <li>Part 4 &mdash; Add a SQL Server MCP to Claude Code
+      <ul><li>What an MCP is &middot; Install &amp; register the server &middot; Let Claude inspect and query your database</li></ul>
+    </li>
+    <li>Part 5 &mdash; Interview readiness
+      <ul><li>Concepts to own &middot; Likely questions &middot; How to talk about AI-assisted development</li></ul>
+    </li>
+    <li>Appendices
+      <ul><li>A: Prompt library &middot; B: Claude Code cheat sheet &middot; C: Troubleshooting &middot; D: Sources</li></ul>
+    </li>
+  </ol>
+</div>
+
+<!-- ============ SECTION 1 ============ -->
+<div class="part">
+<h2>1 &nbsp;How to use this guide</h2>
+
+<p class="lead">This is a "one-shot" curriculum: follow it top to bottom over a weekend and you will have installed a professional toolchain, built two working projects, and &mdash; crucially &mdash; learned to <em>direct</em> an AI coding agent rather than just chat with it.</p>
+
+<h3>The mindset shift</h3>
+<p>Claude Code isn't autocomplete and it isn't a chatbot in a side panel. It's an <strong>agent that lives in your terminal, reads and writes files in your project, runs commands, and iterates</strong>. Your job moves up a level: you describe intent, review diffs, steer architecture, and verify results. The developers who interview well in 2026 aren't the ones who can type the most code &mdash; they're the ones who can decompose a problem, give an agent crisp context, and catch when its output is wrong. That skill is what this weekend trains.</p>
+
+<div class="callout tip"><span class="lbl">Read every diff.</span> The single habit that separates people who get value from Claude Code from people who get burned: never accept a change you haven't looked at. This guide will remind you, but make it reflex.</div>
+
+<h3>How the prompts are formatted</h3>
+<p>Throughout the guide, text you type <em>into Claude Code</em> appears in green blocks like this:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Explain what this repository does in three sentences, then list the files you'd need to change to add a health-check endpoint.</pre>
+<p>Commands you run yourself in PowerShell or a terminal appear in dark blocks:</p>
+<pre><code>claude --version</code></pre>
+
+<h3>The two-day plan</h3>
+<table>
+  <tr><th>Block</th><th>What you build</th><th>Time</th></tr>
+  <tr><td>Sat morning</td><td>Full toolchain installed and verified; Claude Code logged in</td><td>~2 hrs</td></tr>
+  <tr><td>Sat afternoon</td><td>Tic-Tac-Toe web game &mdash; learn the core agent loop safely</td><td>~2&ndash;3 hrs</td></tr>
+  <tr><td>Sun morning</td><td>Capstone: database + C# Web API</td><td>~3 hrs</td></tr>
+  <tr><td>Sun afternoon</td><td>Capstone: Angular front-end + wire everything together</td><td>~2 hrs</td></tr>
+  <tr><td>Sun evening</td><td>Add a SQL Server MCP; interview prep</td><td>~1.5 hrs</td></tr>
+</table>
+
+<div class="callout"><span class="lbl">Pace yourself</span> If you fall behind, the capstone (Part 3) is the part that matters most for interviews. It's fine to skim the game in Part 2 &mdash; but don't skip it entirely, because it's where you learn the workflow without the added complexity of a three-tier stack.</div>
+
+<h3>What "interview-ready" means here</h3>
+<p>By Sunday night you will be able to speak to, and have hands-on reps in: the Git workflow, an Angular single-page app talking to a C# REST API, Entity Framework Core mapping to SQL Server, the request lifecycle across all three tiers, and how modern AI tooling (including MCP) fits into a real dev loop. That is exactly the surface area a mid-level .NET/Angular full-stack interview probes.</p>
+</div>
+
+<!-- ============ SECTION 2 : SETUP ============ -->
+<div class="part">
+<h2>2 &nbsp;Part 1 &mdash; Let Claude Code set up your machine</h2>
+<p class="lead">Here's the twist that makes this fun: you'll do only <strong>two</strong> things by hand &mdash; create your Git host account and install Claude Code itself (it obviously can't install itself). After that, <strong>Claude Code installs and configures the entire rest of the toolchain for you</strong> by running commands, which you approve as they go.</p>
+
+<div class="callout tip"><span class="lbl">How this works</span> Claude Code can run shell commands in your terminal. On Windows it uses <strong>winget</strong> (the built-in package manager) to install software, and a Git-host CLI (the <strong>GitHub CLI</strong> or the <strong>Azure CLI</strong>) to create repos and pull requests &mdash; no manual downloads or installer wizards. It asks permission before each command; you watch and approve.</div>
+
+<div class="callout"><span class="lbl">Choose your Git host</span> This edition supports two hosts &mdash; pick one and follow its blocks throughout (they're colour-coded <span style="color:#6e40c9;font-weight:700">GitHub</span> and <span style="color:#0078d4;font-weight:700">Azure DevOps</span>). <strong>GitHub</strong> is the default for open-source and public portfolios &mdash; easiest to share with an interviewer. <strong>Azure DevOps</strong> is what many enterprises (especially .NET shops) use day to day, so it's excellent interview signal if you're targeting those companies. The app you build is identical either way; only the repo, auth, and pull-request commands differ. You can even do the warm-up on one host and the capstone on the other to learn both.</div>
+
+<h3>2.1 &nbsp;Create your Git host account (the only account you make by hand)</h3>
+<p>Your Git host is where your code lives and where an interviewer will look at your work. Account signup can't be automated, so do this one manually. Follow the block for the host you chose. If you already have an account/org, skip to 2.2.</p>
+
+<div class="opt gh">
+<div class="otag">&#9654; GitHub</div>
+<ol>
+  <li>Go to <a href="https://github.com/signup">github.com/signup</a> and create an account using your email. Pick a professional username &mdash; it becomes part of your portfolio URL (<code>github.com/&lt;you&gt;</code>).</li>
+  <li>Verify your email address.</li>
+  <li>Enable two-factor authentication (Settings &rarr; Password and authentication). GitHub requires 2FA for contributors, and interviewers notice a locked-down account.</li>
+</ol>
+</div>
+
+<div class="opt az">
+<div class="otag">&#9654; Azure DevOps</div>
+<ol>
+  <li>Go to <a href="https://dev.azure.com">dev.azure.com</a> and sign in with a Microsoft account (create a free one if needed). Azure DevOps is free for small teams.</li>
+  <li>When prompted, create an <strong>organization</strong> &mdash; this is your top-level container, at <code>dev.azure.com/&lt;org&gt;</code>. Pick a sensible name.</li>
+  <li>Inside the org, create a <strong>project</strong> (e.g. <code>bootcamp</code>). A project holds your Git repos, boards, and pipelines. Set visibility to Private (the default). You'll create the individual repos later with the CLI.</li>
+</ol>
+<p style="font-size:9.4pt;color:#555">Note the two names you chose &mdash; your <strong>organization</strong> and <strong>project</strong> &mdash; you'll hand them to Claude in step 2.5.</p>
+</div>
+
+<h3>2.2 &nbsp;Install the Claude Code CLI (the one manual install &mdash; bootstrap)</h3>
+<p>This is the only piece of software you install yourself, because it's the tool that will install everything else. On Windows the recommended path is the <strong>native installer</strong> &mdash; a single PowerShell command, no Node.js or admin rights required. It downloads the binary, updates your PATH, and wires up shell hooks.</p>
+<div class="prompt-label">Run in PowerShell (not Command Prompt)</div>
+<pre><code>irm https://claude.ai/install.ps1 | iex</code></pre>
+<div class="callout warn"><span class="lbl">Two gotchas everyone hits</span> (1) This must run in <strong>PowerShell</strong>. If you see <code>'irm' is not recognized</code>, you're in the old Command Prompt &mdash; open "Windows PowerShell" instead. (2) When it finishes, <strong>close the terminal and open a brand-new one</strong>. The PATH change only applies to new shells; your current window still can't find <code>claude</code>.</div>
+<p>In a fresh PowerShell window, verify:</p>
+<pre><code>claude --version</code></pre>
+
+<h3>2.3 &nbsp;First launch and login</h3>
+<p>Create a scratch folder, move into it, and start Claude Code:</p>
+<pre><code>mkdir C:\dev
+cd C:\dev
+claude</code></pre>
+<p>On first run it opens a browser to authenticate. Sign in with your Claude account (a Claude Pro or Max subscription, or Claude API credits, powers the CLI). Once authenticated, you'll drop into the interactive Claude Code prompt inside your terminal. Type <code>/help</code> to see the slash commands.</p>
+
+<h3>2.4 &nbsp;Have Claude Code install the rest of your toolchain</h3>
+<p>Now let the agent take over. From the running Claude Code session in <code>C:\dev</code>, give it this prompt. It will install <strong>Git, Visual Studio Code, and Node.js</strong> via winget, set up your Git identity, and add the VS Code extensions you'll need &mdash; verifying each step.</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Set up this Windows machine for full-stack development. Do it step by
+step, showing me each command before you run it:
+1. Use winget to install Git ( Git.Git ), Visual Studio Code
+   ( Microsoft.VisualStudioCode ), and the Node.js LTS ( OpenJS.NodeJS.LTS ).
+2. Configure my Git identity — ask me for my name and the email on my
+   Git host account, then set user.name, user.email, and
+   init.defaultBranch = main globally.
+3. Install these VS Code extensions with `code --install-extension`:
+   C# Dev Kit (ms-dotnettools.csdevkit), Angular Language Service
+   (Angular.ng-template), and SQL Server (ms-mssql.mssql).
+4. Verify everything: print `git --version`, `node --version`,
+   `npm --version`, and `code --version`.
+If a winget install needs elevation, tell me and I'll approve the UAC prompt.</pre>
+<div class="callout warn"><span class="lbl">Two things to expect</span> (1) Some installs pop a Windows <strong>UAC/admin prompt</strong> &mdash; approve it. (2) Newly installed tools land on your PATH, but the <em>current</em> session may not see them. If a verify step fails with "not recognized," <strong>exit Claude Code, open a fresh PowerShell, and run <code>claude</code> again</strong> from <code>C:\dev</code> &mdash; then ask it to re-run the verification.</div>
+
+<h3>2.5 &nbsp;Connect Claude Code to your Git host</h3>
+<p>So Claude can create repos and open pull requests for you, have it install and authenticate the CLI for your chosen host. You'll complete one browser step; Claude drives the rest.</p>
+
+<div class="opt gh">
+<div class="otag">&#9654; GitHub</div>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Install the GitHub CLI with winget ( GitHub.cli ), then run `gh auth login`
+to authenticate me to GitHub over HTTPS. Walk me through the browser/device
+step. When it's done, confirm with `gh auth status` and `gh api user`
+to show my logged-in username.</pre>
+<p>Follow the on-screen device-code prompt in your browser. Once <code>gh auth status</code> reports you're logged in, Claude can create repositories on your behalf.</p>
+</div>
+
+<div class="opt az">
+<div class="otag">&#9654; Azure DevOps</div>
+<p>Azure DevOps uses the <strong>Azure CLI</strong> (<code>az</code>) plus its <code>azure-devops</code> extension for repo/PR commands, and <strong>Git Credential Manager</strong> (bundled with the Git you installed in 2.4) for push authentication. Give Claude your org and project names from step 2.1.</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Set me up to use Azure DevOps from the CLI, showing each command first:
+1. Install the Azure CLI with winget ( Microsoft.AzureCLI ).
+2. Run `az login` and walk me through the browser sign-in.
+3. Add the DevOps extension: `az extension add --name azure-devops`.
+4. Set my defaults so I don't repeat them:
+   `az devops configure --defaults organization=https://dev.azure.com/<ORG>
+   project=<PROJECT>` — ask me for <ORG> and <PROJECT> first.
+5. Verify with `az repos list --output table` (an empty list is fine — it
+   proves auth and defaults work).
+Git Credential Manager will handle the browser prompt the first time we
+push to Azure DevOps, so no PAT is needed.</pre>
+<p>Once <code>az repos list</code> runs without an auth error, Claude can create repositories in your project.</p>
+</div>
+
+<div class="callout"><span class="lbl">A note on repo visibility</span> On <strong>GitHub</strong> you choose public or private per repo (Part 2 covers this). On <strong>Azure DevOps</strong>, repos live inside your private project and are visible to project members &mdash; there's no one-command "make it public." That's exactly how most corporate code is kept, which is fine; if you want a <em>public</em> portfolio piece, use GitHub for that one, or later mirror the repo to GitHub.</div>
+
+<h3>2.6 &nbsp;The core Claude Code workflow (learn this now)</h3>
+<p>Everything else in this guide is a variation on a handful of moves. Skim them now; they'll click once you're building.</p>
+<table>
+  <tr><th>Move</th><th>What it is / how</th></tr>
+  <tr><td><strong>Interactive session</strong></td><td>Run <code>claude</code> in a project folder. Claude can read/write files there and run commands, asking permission before actions that change things.</td></tr>
+  <tr><td><strong>One-shot</strong></td><td>Run <code>claude -p "your prompt"</code> to get a single answer without entering the interactive UI &mdash; handy in scripts.</td></tr>
+  <tr><td><strong>Plan mode</strong></td><td>Press <strong>Shift+Tab</strong> to cycle modes. "Plan mode" makes Claude propose an approach and wait for your approval <em>before</em> editing anything. Use it for anything non-trivial.</td></tr>
+  <tr><td><strong>CLAUDE.md</strong></td><td>A file at your repo root that Claude reads automatically every session &mdash; your project's standing instructions (stack, conventions, commands). On an <em>existing</em> codebase, run <code>/init</code> to generate a first draft; on a <em>new/empty</em> repo, just ask Claude to create one from your description.</td></tr>
+  <tr><td><strong>Slash commands</strong></td><td><code>/init</code>, <code>/clear</code> (reset context between tasks), <code>/review</code>, <code>/mcp</code> (manage MCP servers), <code>/help</code>.</td></tr>
+  <tr><td><strong>Reviewing changes</strong></td><td>Claude shows a diff before applying edits. Read it, then approve or reject. Approve narrowly at first; broaden as you trust it.</td></tr>
+  <tr><td><strong>Context hygiene</strong></td><td>Run <code>/clear</code> when you switch to an unrelated task so old context doesn't confuse the model.</td></tr>
+</table>
+<div class="callout tip"><span class="lbl">The golden loop</span> <strong>Describe &rarr; let Claude plan &rarr; approve &rarr; review the diff &rarr; run/test &rarr; commit.</strong> Repeat in small slices. Small slices are the whole trick &mdash; a tight task with a clear "done" beats a giant vague one every time.</div>
+
+<h3>2.7 &nbsp;Commit early, commit often</h3>
+<p>By default Claude tends to batch its work and commit at the end. Frequent, small commits are a better habit &mdash; each one is a clean checkpoint you can review or roll back to, and it's exactly how you'll work on a real team. The most reliable way to enforce this is to make it a <strong>standing rule in your CLAUDE.md</strong> so Claude follows it every session without being reminded.</p>
+<p>Once you've created a project's CLAUDE.md (next section), add the rule to it:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Add a "Git workflow" rule to CLAUDE.md: after completing each logical
+change — a feature, a fix, or a refactor that leaves the app working —
+stage and commit it immediately with a clear conventional-commit message,
+rather than batching everything into one commit at the end. Always show me
+the diff and the proposed message before committing, and never commit
+secrets or build artifacts.</pre>
+<p>You can also invoke it ad-hoc at any time in a session:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">From now on in this session, commit after each logical change instead of
+waiting until the end. Show me the message before each commit.</pre>
+<div class="callout"><span class="lbl">Tip</span> "After each logical change" beats "after every edit" &mdash; you want one commit per meaningful unit of work (a working feature), not a commit for every one-line tweak. If Claude commits too coarsely or too finely, just say so; it will adjust.</div>
+
+<h3>2.8 &nbsp;Work on feature branches, not directly on <code>main</code></h3>
+<p>On real teams, nobody commits straight to <code>main</code>. Instead you create a short-lived <strong>feature branch</strong> for each piece of work, commit there, push it, open a <strong>pull request (PR)</strong>, and merge it back into <code>main</code> after review. It keeps <code>main</code> always-working, makes changes reviewable in isolation, and &mdash; for your portfolio &mdash; shows an interviewer you know the professional Git flow. Even solo, it's worth doing.</p>
+<p>The cycle for each feature is the same idea on both hosts; only the PR commands differ:</p>
+<div class="opt gh">
+<div class="otag">&#9654; GitHub</div>
+<div class="filetree">git switch -c feat/scoreboard        # 1. branch off main
+   … build + commit on the branch (small commits) …
+git push -u origin feat/scoreboard   # 2. push the branch
+gh pr create --fill                  # 3. open a pull request
+gh pr merge --squash --delete-branch # 4. merge it, tidy up
+git switch main && git pull          # 5. update local main</div>
+</div>
+<div class="opt az">
+<div class="otag">&#9654; Azure DevOps</div>
+<div class="filetree">git switch -c feat/scoreboard        # 1. branch off main
+   … build + commit on the branch (small commits) …
+git push -u origin feat/scoreboard   # 2. push the branch
+az repos pr create --source-branch feat/scoreboard \
+   --target-branch main --title "Scoreboard" --open   # 3. open a PR
+az repos pr update --id <ID> --status completed \
+   --delete-source-branch true       # 4. complete it, tidy up
+git switch main && git pull          # 5. update local main</div>
+</div>
+<p>Make it a standing rule so Claude does it for you &mdash; you'll fold this into your first project's CLAUDE.md in Part 2 (Claude already knows which host you configured, so it'll use the right commands). The rule to add:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Add a "Branching" rule to CLAUDE.md: never commit directly to main. For
+each new feature or fix, create a feature branch named feat/<short-name>
+or fix/<short-name>, make the small commits there, push the branch, and
+open a pull request using my Git host's CLI — `gh pr create --fill` for
+GitHub, or `az repos pr create --source-branch <branch> --target-branch
+main --title "..."` for Azure DevOps. After I approve, complete/merge the
+PR (`gh pr merge --squash --delete-branch`, or `az repos pr update --id
+<id> --status completed --delete-source-branch true`) and switch back to
+main. Confirm the branch name with me before you start each one.</pre>
+<p>Or turn it on ad-hoc for the next piece of work:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Before we build this, create a feature branch feat/<name> and do all the
+work there. When it's done and committed, push it and open a PR — don't
+merge until I say so.</pre>
+<div class="callout tip"><span class="lbl">The full professional loop</span> Combine the last three sections: <strong>branch &rarr; small commits as you go &rarr; push &rarr; PR &rarr; review &rarr; merge &rarr; pull main.</strong> That's the everyday rhythm at most companies, and being able to narrate it &mdash; and show branches and merged PRs in your repo &mdash; is a real interview signal.</div>
+</div>
+
+<!-- ============ SECTION 3 : TIC TAC TOE ============ -->
+<div class="part">
+<h2>3 &nbsp;Part 2 &mdash; Warm-up build: Tic-Tac-Toe</h2>
+<p class="lead">You'll build a playable browser game with zero framework overhead. The point isn't the game &mdash; it's rehearsing the agent loop end to end: repo, CLAUDE.md, branch, plan mode, iterate, test, commit, push, PR, merge.</p>
+
+<h3>3.1 &nbsp;Let Claude Code create the repository</h3>
+<p>Because you connected your host's CLI in Part 1, Claude can create the repo <em>and</em> clone it locally in one shot. Start a session in your dev folder:</p>
+<pre><code>cd C:\dev
+claude</code></pre>
+
+<div class="opt gh">
+<div class="otag">&#9654; GitHub</div>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Using the GitHub CLI, create a new PRIVATE GitHub repo called
+"tic-tac-toe" with a README, then clone it into C:\dev\tic-tac-toe.
+Use: `gh repo create tic-tac-toe --private --add-readme --clone`.
+Confirm the local folder exists and show me the repo URL.</pre>
+<div class="callout tip" style="margin-top:6px"><span class="lbl">Private or public?</span> Private repos are free and unlimited on GitHub. Public repos double as a portfolio an interviewer can browse. Build <strong>private</strong> while rough, then flip to public once it's polished: swap <code>--private</code> for <code>--public</code> at creation, or run <code>gh repo edit --visibility public</code> later.</div>
+</div>
+
+<div class="opt az">
+<div class="otag">&#9654; Azure DevOps</div>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Using the Azure DevOps CLI, create a new Git repo named "tic-tac-toe" in
+my configured project with `az repos create --name tic-tac-toe`. Take the
+remoteUrl from the output and clone it into C:\dev\tic-tac-toe. The repo
+starts empty, so create a README.md, commit it to a "main" branch, and
+push with `git push -u origin main` to establish main. Show me the repo
+web URL.</pre>
+<p style="font-size:9.4pt;color:#555">Azure repos are created empty (no default branch), so that first README commit is what establishes <code>main</code>. Git Credential Manager will pop a browser sign-in on the first push &mdash; approve it once.</p>
+</div>
+<p>You can also let Claude open the folder in VS Code:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Open C:\dev\tic-tac-toe in VS Code with `code C:\dev\tic-tac-toe`.</pre>
+<div class="callout warn"><span class="lbl">Now switch the session yourself</span> A running Claude Code session's working directory is <strong>fixed for the life of that session</strong> &mdash; it can't move itself into the new repo. So you do this part by hand: exit Claude (<code>/exit</code> or Ctrl+D), then start a fresh session inside the repo:
+<pre style="margin-top:6px"><code>cd C:\dev\tic-tac-toe
+claude</code></pre>
+From here on, Claude is working <em>inside</em> the repo, so its file edits and Git commands land in the right place. (If you'd rather not restart, Claude can instead work from <code>C:\dev</code> and write to full <code>C:\dev\tic-tac-toe\...</code> paths &mdash; it works, just with longer paths. Restarting is cleaner.)</div>
+
+<h3>3.2 &nbsp;Create your CLAUDE.md</h3>
+<p>From inside the <code>tic-tac-toe</code> folder, in your Claude Code session, set up project memory.</p>
+<div class="callout tip"><span class="lbl">Don't use <code>/init</code> on an empty repo</span> The <code>/init</code> command works by <em>scanning an existing codebase</em> and summarizing it. Your repo is brand-new (just a README), so <code>/init</code> has nothing to document &mdash; Claude will correctly tell you it won't invent content. That's expected. Instead, describe the project you're <em>about</em> to build and have Claude write the CLAUDE.md from that. (You'll use <code>/init</code> later, on real code.)</div>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Create a CLAUDE.md for this project. It is a browser-based Tic-Tac-Toe
+game built with plain HTML, CSS, and vanilla JavaScript — no frameworks,
+no build step. Conventions: one index.html, one styles.css, one game.js.
+Keep game logic pure and separated from DOM code so it can be unit tested.
+The app is opened by double-clicking index.html.
+Git workflow: never commit directly to main. Create a feature branch
+(feat/<name>) per feature, commit after each logical change with a clear
+conventional-commit message — don't batch everything into one commit at
+the end — then push the branch and open a PR using my Git host's CLI
+(GitHub `gh pr create --fill`, or Azure DevOps `az repos pr create`).
+Show me the diff and message before each commit.</pre>
+<p>Review the diff, approve it, and you've just created your project's standing context.</p>
+
+<h3>3.3 &nbsp;Start your feature branch</h3>
+<p>Before writing any game code, follow the rule from Part 1: branch off <code>main</code> <em>first</em>, so every commit lands on the branch and <code>main</code> stays clean. From your Claude Code session:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Before we build anything, create and switch to a feature branch called
+feat/game (git switch -c feat/game). Confirm we're on it, then do all the
+game work and commits here — never on main.</pre>
+<p>Everything you build next happens on <code>feat/game</code>. You'll push it and open the pull request once the game works and is tested.</p>
+
+<h3>3.4 &nbsp;Build the game with plan mode</h3>
+<p>Press <strong>Shift+Tab</strong> until the mode indicator reads <em>plan</em>. Then:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Build the complete Tic-Tac-Toe game described in CLAUDE.md.
+Requirements:
+- 3x3 grid, two human players alternating X and O
+- Detect wins (rows, columns, diagonals) and draws
+- A status line showing whose turn it is / who won
+- A "New game" button that resets the board
+- Clean, modern styling with hover states and a subtle win highlight
+Keep the win-detection logic in a pure function I can test later.
+Show me your plan first.</pre>
+<p>Claude will propose a plan and file list. Read it. If it looks right, approve. It then creates <code>index.html</code>, <code>styles.css</code>, and <code>game.js</code>, showing you each diff. Approve them.</p>
+
+<h3>3.5 &nbsp;Run it and iterate</h3>
+<p>Open <code>index.html</code> by double-clicking it in the file explorer (or in VS Code, right-click &rarr; "Reveal in File Explorer"). Play a few rounds. Found something to change? Just say so:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Two things: the winning three cells should flash green for a moment,
+and add a running scoreboard (X wins / O wins / draws) that persists
+across "New game" but resets on page reload.</pre>
+<p>This is the loop that matters: <em>observe &rarr; describe the change in plain English &rarr; review the diff &rarr; refresh the browser.</em> Do it a few times until the game feels polished.</p>
+
+<h3>3.6 &nbsp;Add tests</h3>
+<p>Even for a toy app, practice the habit interviewers care about &mdash; testing the pure logic.</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Extract the win-detection and board logic into a testable module and
+add a small Node-based test suite using the built-in node:test runner
+(no external dependencies). Cover: row win, column win, both diagonals,
+a draw, and an in-progress board. Add an npm "test" script. Then run the
+tests and show me the output.</pre>
+<p>Claude will refactor, write tests, wire up <code>package.json</code>, and run <code>npm test</code> for you. If a test fails, ask it to fix the code (not the test) and re-run. This "red &rarr; green" cycle is exactly what you'll do on real teams.</p>
+
+<h3>3.7 &nbsp;Open a pull request and merge</h3>
+<p>Your work is already on <code>feat/game</code>, so there's nothing to untangle &mdash; just push it and open the PR. Claude knows which host you set up, so it'll pick the right commands:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Push the feat/game branch and open a pull request describing the game and
+its tests, using my Git host's CLI (GitHub: `gh pr create --fill`; Azure
+DevOps: `az repos pr create --source-branch feat/game --target-branch main
+--title "Tic-Tac-Toe game and tests" --open`). Show me the commit messages
+and PR title before you push, then give me the PR URL.</pre>
+<p>Open the PR URL &mdash; this is where a reviewer would comment on a team. Since it's your repo, you can complete it yourself:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Complete/merge the PR, then switch back to main and pull so my local main
+is up to date. Use GitHub `gh pr merge --squash --delete-branch`, or Azure
+DevOps `az repos pr update --id <id> --status completed
+--delete-source-branch true`.</pre>
+<p>Refresh your repo in the browser &mdash; you'll see the merged/completed PR and your game on <code>main</code>. You've now done the complete professional cycle: <strong>branch &rarr; plan &rarr; build &rarr; iterate &rarr; test &rarr; small commits &rarr; push &rarr; PR &rarr; merge</strong>, all directed through the CLI &mdash; on the host of your choice.</p>
+
+<div class="callout tip"><span class="lbl">Optional stretch</span> Ask Claude to add an unbeatable computer opponent using the minimax algorithm, then have it explain minimax to you line by line. Great interview fodder and a good test of using Claude to <em>learn</em>, not just to produce.</div>
+</div>
+
+<!-- ============ SECTION 4 : CAPSTONE ============ -->
+<div class="part">
+<h2>4 &nbsp;Part 3 &mdash; The capstone: full-stack task tracker</h2>
+<p class="lead">Now the real thing: a three-tier application on the exact stack you'll be interviewed on. You'll build a <strong>Task Tracker</strong> &mdash; an Angular UI, a C# Web API, and a SQL Server database &mdash; then connect a database MCP so Claude can inspect the data directly.</p>
+
+<h3>4.1 &nbsp;The architecture</h3>
+<p>Three tiers, each with one job. Understanding this diagram &mdash; and being able to draw it on a whiteboard &mdash; is half of a full-stack interview.</p>
+<div class="filetree">┌──────────────────────────────────────────────┐
+│  FRONT END  ·  presentation tier               │
+│  Angular 22 SPA — TypeScript, signals          │
+│  http://localhost:4200                         │
+└──────────────────────────────────────────────┘
+        │  HTTP request (JSON)   ▲  JSON response
+        ▼                        │
+┌──────────────────────────────────────────────┐
+│  MIDDLE TIER  ·  application tier               │
+│  C# / .NET 10 Web API — Controllers + EF Core  │
+│  REST endpoints at http://localhost:5xxx       │
+└──────────────────────────────────────────────┘
+        │  LINQ → SQL (EF Core)  ▲  result sets
+        ▼                        │
+┌──────────────────────────────────────────────┐
+│  BACKEND  ·  data tier                          │
+│  SQL Server 2025 Express — TaskTrackerDb        │
+│  Tasks table                                   │
+└──────────────────────────────────────────────┘</div>
+<ul>
+  <li><strong>Backend (data tier):</strong> SQL Server 2025 Express stores the data in a <code>Tasks</code> table.</li>
+  <li><strong>Middle tier (application tier):</strong> A C#/.NET 10 Web API exposes REST endpoints (<code>GET/POST/PUT/DELETE /api/tasks</code>) and uses <strong>Entity Framework Core</strong> to talk to the database.</li>
+  <li><strong>Front end (presentation tier):</strong> An Angular 22 single-page app calls the API over HTTP and renders the UI.</li>
+</ul>
+
+<h3>4.2 &nbsp;Have Claude Code install the capstone toolchain</h3>
+<p>Three more tools to install &mdash; and again, Claude does the work. Start a Claude Code session in <code>C:\dev</code> and give it this prompt.</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Install the toolchain for a .NET + Angular + SQL Server capstone, showing
+each command first and verifying as you go:
+1. .NET 10 SDK via winget ( Microsoft.DotNet.SDK.10 ). Verify with
+   `dotnet --version` (expect 10.x).
+2. SQL Server 2025 Express. Try winget first
+   ( Microsoft.SQLServer.2025.Express ); if that package ID isn't in the
+   winget catalog yet, download the official installer from
+   https://www.microsoft.com/sql-server/sql-server-downloads and run the
+   Basic install. The result I need: an instance at localhost\SQLEXPRESS.
+3. SQL Server Management Studio (SSMS) via winget
+   ( Microsoft.SQLServerManagementStudio ).
+4. The Angular CLI globally: `npm install -g @angular/cli`, then verify
+   with `ng version` (expect Angular CLI 22.x).
+Tell me whenever a step needs a UAC/admin prompt. When done, summarize
+what got installed and the versions.</pre>
+<div class="callout"><span class="lbl">Two ways to connect</span> By default Express installs with <strong>Windows Authentication</strong> and instance name <code>localhost\SQLEXPRESS</code> &mdash; easiest for the API (no password). For the MCP later, you'll enable <strong>mixed-mode auth</strong>, create a login, and turn on <strong>TCP/IP</strong>; Part 4 covers that (and Claude can do it). For now, Windows auth is fine.</div>
+<div class="callout warn"><span class="lbl">If a winget package isn't found</span> Package IDs and availability shift over time. If Claude reports it can't find, say, the SQL Server 2025 Express ID, let it fall back to the official installer &mdash; or run <code>winget search "SQL Server"</code> and tell Claude which ID showed up. Remember to restart Claude Code in a fresh terminal after installs so new CLIs (<code>dotnet</code>, <code>ng</code>) are on its PATH.</div>
+
+<h3>4.3 &nbsp;Let Claude Code create and scaffold the solution</h3>
+<p>Have Claude create the capstone repo (via your host's CLI, same as before); then you'll restart the session inside it, just like in Part 2:</p>
+<div class="opt gh">
+<div class="otag">&#9654; GitHub</div>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Using the GitHub CLI, create a PRIVATE repo named "task-tracker" with a
+README and clone it to C:\dev\task-tracker
+( `gh repo create task-tracker --private --add-readme --clone` ), then
+open it in VS Code with `code C:\dev\task-tracker`. Show me the repo URL.</pre>
+</div>
+<div class="opt az">
+<div class="otag">&#9654; Azure DevOps</div>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Using the Azure DevOps CLI, create a Git repo named "task-tracker" in my
+project ( `az repos create --name task-tracker` ), clone its remoteUrl to
+C:\dev\task-tracker, add and push an initial README on a "main" branch
+(`git push -u origin main`), then open it in VS Code with
+`code C:\dev\task-tracker`. Show me the repo web URL.</pre>
+</div>
+<div class="callout warn"><span class="lbl">Restart the session in the new folder</span> Same as before: the current session can't move itself into the new repo. Exit Claude, then relaunch inside it:
+<pre style="margin-top:6px"><code>cd C:\dev\task-tracker
+claude</code></pre>
+Now Claude is working inside the capstone repo for the rest of Part 3.</div>
+<div class="callout tip"><span class="lbl">Make it your portfolio piece</span> Keep this repo private while you build. <strong>On GitHub</strong>, once it's polished with a strong README (see 6.4) you can flip it public so interviewers can browse it: <code>gh repo edit --visibility public</code>. <strong>On Azure DevOps</strong> it stays inside your project; to show it off publicly, ask Claude to also push a mirror to a public GitHub repo. Either way, this capstone is the one most worth showing.</div>
+<p>With Claude Code now working inside <code>C:\dev\task-tracker</code>, set up project memory so every later prompt inherits the stack and conventions:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Create a CLAUDE.md for a full-stack "Task Tracker" app with this layout:
+- /api  → C# .NET 10 Web API (controllers + EF Core), talks to SQL Server
+- /web  → Angular 22 single-page app that calls the API
+- SQL Server 2025 Express database named TaskTrackerDb with a Tasks table
+  (Id, Title, Description, IsDone, DueDate, CreatedAt).
+
+Record these conventions:
+- API uses EF Core code-first with migrations; enable CORS for the Angular
+  dev server at http://localhost:4200; return DTOs, not entities.
+- Angular uses a typed TaskService with HttpClient and standalone components.
+- Never commit secrets; connection strings live in appsettings.Development.json.
+- Git workflow: never commit to main directly. Use a feature branch
+  (feat/<name>) per feature, commit after each logical change with a clear
+  conventional-commit message (don't batch to one commit at the end), then
+  push and open a PR with my host's CLI (GitHub `gh pr create --fill`, or
+  Azure DevOps `az repos pr create`). Show me the diff and message before
+  each commit.
+Also add a "How to run" section with the exact commands for each tier.</pre>
+<p>Review and approve. This one file will keep Claude consistent across dozens of prompts.</p>
+<p>Now branch before you build &mdash; the same rule as the warm-up. On a real team you'd open a branch per feature; for this capstone, put the whole build on one feature branch so your commits stay off <code>main</code> and land in a single reviewable PR:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Before scaffolding any code, create and switch to a feature branch
+feat/task-tracker (git switch -c feat/task-tracker). Build all three tiers
+here with a small commit per logical change — nothing goes on main.</pre>
+
+<h3>4.4 &nbsp;Build the backend: database + C# Web API</h3>
+<p>Switch to <strong>plan mode</strong> (Shift+Tab) for this &mdash; it's the most architectural part. Then:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Scaffold the /api project: a .NET 10 Web API using `dotnet new webapi`.
+Add EF Core with the SQL Server provider. Create a Task entity and a
+TaskDbContext, a TasksController exposing full CRUD at /api/tasks
+(GET all, GET by id, POST, PUT, DELETE), and DTOs so we don't expose
+entities directly. Configure the connection string in
+appsettings.Development.json for SQL Server Express using
+Server=localhost\SQLEXPRESS;Database=TaskTrackerDb;Trusted_Connection=True;
+TrustServerCertificate=True. Enable CORS for http://localhost:4200.
+Show me the plan and the file tree before writing anything.</pre>
+<p>Approve the plan, then let it create the project and review the diffs. When it's ready, have Claude create and apply the first migration &mdash; this is what actually builds your <code>Tasks</code> table in SQL Server:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Install the dotnet-ef tool if needed, add an initial EF Core migration
+called InitialCreate, and update the database so the Tasks table is
+created in SQL Server. Then run the API and show me the Swagger URL.
+If anything fails, read the error and fix it.</pre>
+<p>Claude runs <code>dotnet ef migrations add</code>, <code>dotnet ef database update</code>, and <code>dotnet run</code>. Open the Swagger URL it gives you (something like <code>http://localhost:5xxx/swagger</code>) and try the endpoints. Create a task via <code>POST</code>, then <code>GET</code> it back.</p>
+<div class="callout tip"><span class="lbl">Verify in SSMS</span> Open SQL Server Management Studio, connect to <code>localhost\SQLEXPRESS</code> with Windows Authentication, expand <em>Databases &rarr; TaskTrackerDb &rarr; Tables</em>, right-click <code>dbo.Tasks</code> &rarr; "Select Top 1000 Rows". Seeing your row here proves all the way down the stack works.</div>
+
+<h4>Understand what you just built</h4>
+<p>Before moving on, use Claude to <em>learn</em>, because these are interview questions:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Walk me through exactly what happens when a GET /api/tasks request
+arrives: routing, the controller action, how EF Core turns my LINQ into
+SQL, and how the result becomes JSON. Then explain what a migration is
+and why we use code-first instead of writing SQL by hand.</pre>
+
+<h3>4.5 &nbsp;Build the front end: Angular 22</h3>
+<p>Now the presentation tier. Keep the API running in its own terminal; open a <em>second</em> terminal for the web work (you can run <code>claude</code> in either &mdash; Claude can manage both projects from the repo root).</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Scaffold the /web project with `ng new web` (routing on, CSS). Then build
+a Task Tracker UI:
+- A typed Task interface matching the API DTO.
+- A TaskService using HttpClient with methods for list/create/update/
+  delete, pointing at the API base URL from an environment file.
+- A main component that lists tasks, lets me add one (title, description,
+  due date), toggle done, and delete. Use standalone components.
+- Clean, responsive styling; show a loading state and handle errors.
+Configure the dev proxy so calls to /api go to the .NET API and avoid
+CORS issues. Show me the plan first, then build it.</pre>
+<p>Approve, review the diffs, then start the dev server:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Start the Angular dev server and tell me the URL. Make sure the proxy to
+the API is working. If you hit an error, read it and fix it, then re-run.</pre>
+<p>Open <code>http://localhost:4200</code>. With the API still running, you should see tasks load, and be able to add/complete/delete them &mdash; each action round-trips through all three tiers.</p>
+
+<h3>4.6 &nbsp;Wire it together and prove the full loop</h3>
+<p>Do one deliberate end-to-end test so you understand the whole request path:</p>
+<ol>
+  <li>In the Angular UI, add a task called <em>"Prep for interview"</em>.</li>
+  <li>Watch the network call in the browser dev tools (F12 &rarr; Network) &mdash; you'll see the <code>POST /api/tasks</code>.</li>
+  <li>Refresh SSMS's <code>Tasks</code> query &mdash; the new row is there.</li>
+</ol>
+<p>You just traced a write from TypeScript &rarr; HTTP &rarr; C# controller &rarr; EF Core &rarr; SQL Server. That's the full-stack loop, and being able to narrate it is exactly what interviewers want.</p>
+
+<h4>Harden it</h4>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Add input validation on both tiers: required Title on the API (return
+400 with a helpful message) and matching form validation in Angular.
+Add a couple of xUnit tests for the API controller and Vitest tests for
+the TaskService. Run all tests and show me the results. Then update
+CLAUDE.md's "How to run" section so it's accurate.</pre>
+
+<h3>4.7 &nbsp;Open the pull request and merge</h3>
+<p>All your work is already on <code>feat/task-tracker</code>, so closing out is clean &mdash; commit anything loose, make sure secrets and build artifacts are ignored, then push and open one PR:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">First, create a .gitignore appropriate for a .NET + Angular repo (ignore
+bin, obj, node_modules, and any appsettings with secrets). Then commit any
+remaining work on feat/task-tracker with clear messages, push the branch,
+and open a PR with my host's CLI (`gh pr create --fill` for GitHub, or
+`az repos pr create --source-branch feat/task-tracker --target-branch main
+--title "Task Tracker capstone"` for Azure DevOps). Before pushing, list
+exactly what you're about to commit and confirm no secrets or build
+artifacts are included.</pre>
+<div class="callout warn"><span class="lbl">Check before you push</span> Read the file list Claude prints. Confirm <code>node_modules/</code>, <code>bin/</code>, <code>obj/</code>, and any file with a real connection string are excluded. Leaking secrets is the one mistake that genuinely hurts &mdash; and on a private repo it's still a bad habit to break now.</div>
+<p>Then review and merge the PR:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Show me a summary of the open PR, then complete it and update local main.
+Use GitHub `gh pr merge --squash --delete-branch`, or Azure DevOps
+`az repos pr update --id <id> --status completed --delete-source-branch
+true`. List the merged/completed PRs so I can see the history.</pre>
+</div>
+
+<!-- ============ SECTION 5 : MCP ============ -->
+<div class="part">
+<h2>5 &nbsp;Part 4 &mdash; Add a SQL Server MCP to Claude Code</h2>
+<p class="lead">The Model Context Protocol lets Claude Code connect to external systems through standard "servers." You'll add a <strong>SQL Server MCP</strong> so Claude can inspect your schema and run queries against <code>TaskTrackerDb</code> directly &mdash; turning it into a database-aware pair programmer.</p>
+
+<h3>5.1 &nbsp;What an MCP actually is</h3>
+<p>An MCP server is a small program that exposes <strong>tools</strong> (and sometimes data resources) over a standard protocol. Claude Code launches the server, discovers its tools, and can call them on your behalf &mdash; with your approval. A SQL Server MCP typically exposes tools like "list tables," "describe a table," and "run a read-only query." The value: instead of you copy-pasting schema into a prompt, Claude can go look for itself. This is the same mechanism companies use to give AI agents safe, governed access to internal systems &mdash; which is why it comes up in interviews.</p>
+<div class="callout tip"><span class="lbl">Prefer read-only</span> For learning, register the MCP in a read-only mode (query and inspect, no writes). It keeps Claude from ever altering your data by accident, and it mirrors how responsible teams scope agent access in production.</div>
+
+<h3>5.2 &nbsp;Prepare a database login for the MCP</h3>
+<p>Most SQL Server MCP servers connect with a username/password (SQL authentication) rather than Windows auth. Set that up once in SSMS:</p>
+<ol>
+  <li>In SSMS, right-click the server &rarr; <strong>Properties &rarr; Security</strong> &rarr; select <strong>"SQL Server and Windows Authentication mode"</strong>. Click OK.</li>
+  <li>Right-click the server &rarr; <strong>Restart</strong> (mixed mode needs a restart).</li>
+  <li>Under <em>Security &rarr; Logins</em>, create a new login &mdash; e.g. <code>mcp_reader</code> with a password &mdash; and grant it <strong>read access</strong> to <code>TaskTrackerDb</code> (map the login to the database with the <code>db_datareader</code> role).</li>
+</ol>
+<div class="callout"><span class="lbl">Let Claude help</span> You can ask Claude Code to generate the exact T-SQL for creating a read-only login and role membership, then run it in SSMS. Prompt: <em>"Give me T-SQL to create a SQL login 'mcp_reader' with a password, mapped to TaskTrackerDb with only db_datareader."</em></div>
+
+<h3>5.3 &nbsp;Enable TCP/IP so the MCP can connect</h3>
+<p>SQL Server Express installs with the <strong>TCP/IP</strong> protocol disabled &mdash; out of the box it only listens on shared memory / named pipes. The MCP server connects over TCP, so turn it on once:</p>
+<ol>
+  <li>Open <strong>SQL Server Configuration Manager</strong>.</li>
+  <li>Under <em>SQL Server Network Configuration &rarr; Protocols for SQLEXPRESS</em>, right-click <strong>TCP/IP</strong> &rarr; <strong>Enable</strong>.</li>
+  <li>Double-click <strong>TCP/IP</strong> &rarr; <em>IP Addresses</em> tab &rarr; scroll to <strong>IPAll</strong> and set <strong>TCP Port</strong> to <code>1433</code> (clear <em>TCP Dynamic Ports</em> if it has a value).</li>
+  <li>Restart the <strong>SQL Server (SQLEXPRESS)</strong> service &mdash; in Configuration Manager under <em>SQL Server Services</em>, or via <code>services.msc</code>.</li>
+</ol>
+<div class="callout warn"><span class="lbl">This is the common gotcha</span> If you skip this, the MCP shows <em>failed</em> in <code>claude mcp list</code> even when your login and password are correct &mdash; the server just isn't reachable over TCP yet. Enabling TCP/IP on port 1433 is what lets <code>Server=localhost,1433</code> in the connection string below resolve.</div>
+
+<h3>5.4 &nbsp;Register the MCP server with Claude Code</h3>
+<p>Claude Code manages MCP servers with the <code>claude mcp</code> command. There are several community SQL Server MCP servers; a Node-based one you can run via <code>npx</code> is the simplest to start with. The <code>mssql-mcp-server</code> package takes a single <strong>connection string</strong> rather than separate variables &mdash; note <code>Server=localhost,1433</code> (a TCP address plus the port you set above). From your project folder:</p>
+<div class="prompt-label">Run in your terminal (exit Claude first, or use a second window)</div>
+<pre><code>claude mcp add sqlserver `
+  --env "MSSQL_CONNECTION_STRING=Server=localhost,1433;Database=TaskTrackerDb;User Id=mcp_reader;Password=YourStrongPassword;TrustServerCertificate=true;Encrypt=false;" `
+  -- npx -y mssql-mcp-server</code></pre>
+<div class="callout tip"><span class="lbl">Watch the connection string</span> Keep it on one line, quoted, and end it with a semicolon. <code>TrustServerCertificate=true</code> and <code>Encrypt=false</code> are what let a local dev instance connect without a real TLS certificate. Swap in your own <code>mcp_reader</code> password.</div>
+<p>The exact variable names and package differ between MCP servers &mdash; some take separate <code>MSSQL_SERVER</code> / <code>MSSQL_USER</code> settings and a named instance (<code>localhost\SQLEXPRESS</code>) instead of a connection string. Check the README of the one you pick (a few options are listed in Appendix D). The shape is always the same: a command Claude runs, plus connection settings.</p>
+<div class="callout tip"><span class="lbl">Don't hand-edit config blindly</span> <code>claude mcp add</code> writes the configuration for you. You can also inspect or hand-edit the generated MCP config file, but using the command avoids typos. Verify with <code>claude mcp list</code> &mdash; your server should appear and show <em>Connected</em>.</div>
+
+<h3>5.5 &nbsp;Use the MCP inside Claude Code</h3>
+<p>Start Claude Code again in the project. Confirm the server is live:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">/mcp</pre>
+<p>You should see <code>sqlserver</code> listed with its available tools. Now put it to work &mdash; Claude will call the MCP's tools (asking your approval) rather than guessing:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Using the sqlserver MCP, list the tables in TaskTrackerDb, then describe
+the Tasks table's columns and types. How many tasks are marked done vs
+not done? Show me the query you ran.</pre>
+<p>Then combine it with the codebase &mdash; this is where MCP shines:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Compare the live Tasks table schema (via the sqlserver MCP) against my
+EF Core Task entity in /api. Do they match? If the model has drifted from
+the database, tell me exactly what's different and what migration would
+reconcile them.</pre>
+<p>That single prompt &mdash; reading your real database <em>and</em> your source to catch schema drift &mdash; is a genuinely useful workflow and a great thing to demo or describe in an interview.</p>
+
+<div class="callout warn"><span class="lbl">Safety reminder</span> Even read-only, treat the MCP like production access. Never point an MCP at a database with real customer data during a casual learning session, and never paste real credentials into a repo. Keep the <code>mcp_reader</code> password out of Git.</div>
+</div>
+
+<!-- ============ SECTION 6 : INTERVIEW ============ -->
+<div class="part">
+<h2>6 &nbsp;Part 5 &mdash; Interview readiness</h2>
+<p class="lead">You've built the thing. Now make sure you can <em>talk</em> about it. Interviewers probe understanding, not just output &mdash; especially in the age of AI assistance.</p>
+
+<h3>6.1 &nbsp;Concepts to own cold</h3>
+<table>
+  <tr><th>Area</th><th>Be able to explain&hellip;</th></tr>
+  <tr><td>Architecture</td><td>Why three tiers; what each tier is responsible for; how a request flows front-to-back and back again.</td></tr>
+  <tr><td>Angular</td><td>Components vs services; dependency injection; <code>HttpClient</code> and Observables/signals; standalone components; what the dev proxy does and why CORS exists.</td></tr>
+  <tr><td>C# / .NET Web API</td><td>Controllers and routing; model binding; DTOs vs entities and why you separate them; dependency injection; async/await; status codes.</td></tr>
+  <tr><td>EF Core</td><td>Code-first vs database-first; what a migration is; how LINQ becomes SQL; <code>DbContext</code> lifetime; the N+1 problem.</td></tr>
+  <tr><td>SQL Server</td><td>Basic joins, indexes, primary/foreign keys; why parameterized queries prevent SQL injection; connection strings and auth modes.</td></tr>
+  <tr><td>Git &amp; host</td><td>Branch, commit, push, pull request, merge conflict basics; a good commit message; the branch&rarr;PR&rarr;merge flow on GitHub <em>or</em> Azure DevOps.</td></tr>
+  <tr><td>AI tooling / MCP</td><td>What Claude Code is; what MCP does; how you keep AI-assisted work safe (read diffs, scope access, don't commit secrets).</td></tr>
+</table>
+
+<h3>6.2 &nbsp;Use Claude to quiz yourself</h3>
+<p>This is one of the best uses of the CLI. In your <code>task-tracker</code> repo:</p>
+<div class="prompt-label">&#9654; Prompt to Claude Code</div>
+<pre class="prompt">Act as a technical interviewer for a mid-level .NET + Angular full-stack
+role. Ask me one question at a time about THIS codebase and the concepts
+behind it. After each answer, rate it, correct anything wrong, and ask a
+harder follow-up. Start with the request lifecycle across all three tiers.</pre>
+<p>Because Claude can see your actual code, the questions are grounded in what you built &mdash; far more useful than generic flashcards. Do a dozen rounds.</p>
+
+<h3>6.3 &nbsp;Likely questions (rehearse out loud)</h3>
+<ul>
+  <li>"Walk me through what happens when a user adds a task in your app."</li>
+  <li>"Why did you use DTOs instead of returning EF entities directly?"</li>
+  <li>"How does your Angular app avoid CORS problems in development?"</li>
+  <li>"What's a migration, and what would you do if two developers created conflicting ones?"</li>
+  <li>"How do you prevent SQL injection here?"</li>
+  <li>"Where would this design struggle at scale, and what would you change first?"</li>
+  <li>"How do you use AI tools responsibly &mdash; what do you check before accepting generated code?"</li>
+</ul>
+
+<h3>6.4 &nbsp;How to talk about AI-assisted development</h3>
+<p>Some interviewers are wary of candidates who "just let the AI do it." Frame your weekend honestly and well: you used Claude Code as a force multiplier, but you <strong>directed the architecture, read every diff, wrote/ran tests, and can explain every layer</strong>. That's the profile teams want &mdash; someone who ships faster <em>and</em> understands what shipped. Being able to say "I used an MCP to diff my live schema against my EF model" signals you're current, not that you're coasting.</p>
+
+<div class="callout tip"><span class="lbl">Portfolio polish</span> Ask Claude to write a strong <code>README.md</code> for the task-tracker repo: a screenshot or GIF, the architecture diagram, setup steps, and a short "what I learned" note. A clean README is often the first thing an interviewer reads.</div>
+
+<h3>6.5 &nbsp;Where to go next</h3>
+<ul>
+  <li>Add authentication (JWT) to the API and a login screen in Angular.</li>
+  <li>Add pagination, sorting, and filtering to the task list &mdash; classic interview extensions.</li>
+  <li>Containerize with Docker and write a <code>docker-compose</code> that runs API + SQL Server together.</li>
+  <li>Add a CI pipeline that builds and runs your tests on every push &mdash; <strong>GitHub Actions</strong> if you're on GitHub, or <strong>Azure Pipelines</strong> if you're on Azure DevOps. Knowing one of these is a strong plus in interviews.</li>
+</ul>
+<p>Each of these is a great follow-up prompt to Claude Code &mdash; and each makes your portfolio noticeably stronger.</p>
+</div>
+
+<!-- ============ APPENDICES ============ -->
+<div class="part">
+<h2>7 &nbsp;Appendices</h2>
+
+<h3>Appendix A &mdash; Prompt library</h3>
+<p>Reusable prompts. Adapt the specifics; keep the shape.</p>
+<table>
+  <tr><th>When you want to&hellip;</th><th>Prompt</th></tr>
+  <tr><td>Understand a repo</td><td><em>"Give me a 3-sentence summary of this repo, its main entry points, and how to run it."</em></td></tr>
+  <tr><td>Plan before building</td><td><em>"Show me your plan and the files you'll touch before writing any code."</em> (or press Shift+Tab for plan mode)</td></tr>
+  <tr><td>Make a focused change</td><td><em>"Only change X. Don't touch anything else. Show me the diff."</em></td></tr>
+  <tr><td>Debug</td><td><em>"Run it, read the actual error, and fix the root cause &mdash; not just the symptom. Then re-run to confirm."</em></td></tr>
+  <tr><td>Learn while building</td><td><em>"Explain what you just did and why, as if teaching a junior dev."</em></td></tr>
+  <tr><td>Feature branch</td><td><em>"Create a feature branch feat/&lt;name&gt; and do this work there. When done, push and open a PR &mdash; don't merge until I say so."</em></td></tr>
+  <tr><td>Commit often</td><td><em>"Commit after each logical change instead of batching to the end. Show me the message before each commit."</em> (better yet, put this in CLAUDE.md)</td></tr>
+  <tr><td>Safe Git</td><td><em>"Show me exactly what you'll commit and the message, before committing."</em></td></tr>
+  <tr><td>Self-review</td><td><em>"Review your own change for bugs, edge cases, and security issues before I approve."</em></td></tr>
+</table>
+
+<h3>Appendix B &mdash; Claude Code &amp; Git-host cheat sheet</h3>
+<table>
+  <tr><th>Command / key</th><th>Does</th></tr>
+  <tr><td><code>claude</code></td><td>Start an interactive session in the current folder</td></tr>
+  <tr><td><code>claude -p "..."</code></td><td>One-shot prompt, prints answer and exits</td></tr>
+  <tr><td><code>claude --version</code></td><td>Show installed version</td></tr>
+  <tr><td><strong>Shift+Tab</strong></td><td>Cycle modes (incl. plan mode)</td></tr>
+  <tr><td><code>/init</code></td><td>Scan an <em>existing</em> codebase and generate a starter CLAUDE.md (not for empty repos)</td></tr>
+  <tr><td><code>/clear</code></td><td>Reset the conversation context</td></tr>
+  <tr><td><code>/review</code></td><td>Ask Claude to review pending changes</td></tr>
+  <tr><td><code>/mcp</code></td><td>View/manage connected MCP servers</td></tr>
+  <tr><td><code>/help</code></td><td>List all slash commands</td></tr>
+  <tr><td><code>claude mcp add / list</code></td><td>Register or list MCP servers (run outside the session)</td></tr>
+  <tr><td><code>git switch -c feat/x</code></td><td>Create and switch to a new feature branch</td></tr>
+  <tr><td colspan="2" style="background:#faf9fe;color:#6e40c9;font-weight:700;font-size:8.4pt">GitHub CLI</td></tr>
+  <tr><td><code>gh repo create x --private --add-readme --clone</code></td><td>Create &amp; clone a repo</td></tr>
+  <tr><td><code>gh pr create --fill</code></td><td>Open a pull request from the current branch</td></tr>
+  <tr><td><code>gh pr merge --squash --delete-branch</code></td><td>Merge a PR and tidy up</td></tr>
+  <tr><td colspan="2" style="background:#f5faff;color:#0078d4;font-weight:700;font-size:8.4pt">Azure DevOps CLI (az)</td></tr>
+  <tr><td><code>az repos create --name x</code></td><td>Create a repo in the default project (returns remoteUrl)</td></tr>
+  <tr><td><code>az repos pr create --source-branch feat/x --target-branch main --title "..."</code></td><td>Open a pull request</td></tr>
+  <tr><td><code>az repos pr update --id N --status completed --delete-source-branch true</code></td><td>Complete a PR and tidy up</td></tr>
+  <tr><td>Ctrl+D or <code>/exit</code></td><td>Quit the session</td></tr>
+</table>
+
+<h3>Appendix C &mdash; Troubleshooting</h3>
+<table>
+  <tr><th>Symptom</th><th>Fix</th></tr>
+  <tr><td><code>'claude' is not recognized</code></td><td>You opened the terminal before installing, or didn't reopen after install. Close and open a <strong>new</strong> PowerShell window so the PATH refreshes.</td></tr>
+  <tr><td><code>'irm' is not recognized</code></td><td>You're in Command Prompt, not PowerShell. Open "Windows PowerShell" and re-run the install command.</td></tr>
+  <tr><td>API can't reach SQL Server</td><td>Confirm the instance name is <code>localhost\SQLEXPRESS</code>, the SQL Server service is running (check <em>Services</em>), and the connection string has <code>TrustServerCertificate=True</code>.</td></tr>
+  <tr><td>Angular calls fail with CORS</td><td>Ensure the API's CORS policy allows <code>http://localhost:4200</code>, or that the Angular dev proxy is configured and you started via the proxy.</td></tr>
+  <tr><td><code>dotnet ef</code> not found</td><td>Install the tool: <code>dotnet tool install --global dotnet-ef</code>, then reopen the terminal.</td></tr>
+  <tr><td>MCP shows "failed" in <code>claude mcp list</code></td><td>Most often <strong>TCP/IP isn't enabled</strong> &mdash; turn it on for SQLEXPRESS in SQL Server Configuration Manager, set the port to 1433, and restart the service. Then confirm mixed-mode auth is on, the <code>mcp_reader</code> credentials are correct, and the connection string uses <code>Server=localhost,1433</code>. Check the MCP server's README for its exact variable names.</td></tr>
+  <tr><td>Git push asks repeatedly for login</td><td>Let the Git Credential Manager browser prompt complete once; it caches after that (works for both GitHub and Azure DevOps).</td></tr>
+  <tr><td><strong>Azure:</strong> <code>az: command not found</code> / <code>az repos</code> errors</td><td>Reopen the terminal after installing the Azure CLI. If <code>az repos</code> is unknown, run <code>az extension add --name azure-devops</code>. If it can't find your org/project, re-run <code>az devops configure --defaults organization=... project=...</code>.</td></tr>
+  <tr><td><strong>Azure:</strong> push rejected / auth loop</td><td>Ensure you completed <code>az login</code> and the first-push browser prompt from Git Credential Manager. As a fallback, a Personal Access Token (Azure DevOps &rarr; User settings &rarr; Personal access tokens) can be used as the password.</td></tr>
+</table>
+
+<h3>Appendix D &mdash; Sources &amp; tool references</h3>
+<p>Versions and steps in this guide were verified against current documentation in July 2026. Always check the linked pages for the latest.</p>
+<ul>
+  <li>Claude Code setup &amp; native installer &mdash; <a href="https://code.claude.com/docs/en/setup">code.claude.com/docs/en/setup</a></li>
+  <li>Claude Code MCP configuration &mdash; <a href="https://code.claude.com/docs/en/mcp">code.claude.com/docs/en/mcp</a></li>
+  <li>.NET 10 SDK download &mdash; <a href="https://dotnet.microsoft.com/download/dotnet/10.0">dotnet.microsoft.com/download/dotnet/10.0</a></li>
+  <li>Angular releases &amp; CLI &mdash; <a href="https://angular.dev/reference/releases">angular.dev/reference/releases</a></li>
+  <li>SQL Server downloads (2025 Express) &mdash; <a href="https://www.microsoft.com/sql-server/sql-server-downloads">microsoft.com/sql-server/sql-server-downloads</a></li>
+  <li>Git for Windows &mdash; <a href="https://git-scm.com/download/win">git-scm.com/download/win</a></li>
+  <li>Visual Studio Code &mdash; <a href="https://code.visualstudio.com">code.visualstudio.com</a></li>
+  <li>GitHub CLI &mdash; <a href="https://cli.github.com">cli.github.com</a></li>
+  <li>Azure DevOps CLI (<code>az repos</code>) &mdash; <a href="https://learn.microsoft.com/cli/azure/repos">learn.microsoft.com/cli/azure/repos</a></li>
+  <li>Azure Repos authentication &mdash; <a href="https://learn.microsoft.com/azure/devops/repos/git/set-up-credential-managers">learn.microsoft.com/azure/devops/repos/git/set-up-credential-managers</a></li>
+  <li>Example SQL Server MCP servers &mdash; <a href="https://www.npmjs.com/package/mssql-mcp-server">mssql-mcp-server</a> (connection-string based; used above), <a href="https://github.com/bilims/mcp-sqlserver">github.com/bilims/mcp-sqlserver</a>, <a href="https://github.com/cwilby/mcp-node-mssql">github.com/cwilby/mcp-node-mssql</a></li>
+</ul>
+
+<hr class="soft">
+<p style="text-align:center; color:#8a8f98; font-size:9pt; margin-top:18px;">Built for a focused weekend. Read every diff, test as you go, and by Sunday night you'll have two repos on your Git host &mdash; GitHub or Azure DevOps &mdash; and the vocabulary to back them up. Good luck.</p>
+</div>
+
+</body>
+</html>
