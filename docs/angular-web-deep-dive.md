@@ -444,6 +444,10 @@ export class TaskService {
 }
 ```
 
+See the Appendix for a line-by-line anatomy of the `@Injectable`/
+`export class`/field-initializer declaration at the top of this file
+— including why there's no constructor.
+
 This is the repo's enforced convention (see root `CLAUDE.md`): **no
 component calls `HttpClient` directly** — everything routes through
 this typed service, mirroring why the API layer routes everything
@@ -743,3 +747,76 @@ request/response, not live) — it's closer to WPF/XAML's `{Binding
 Path=..., Mode=TwoWay}`: a control and a backing field kept
 continuously in sync while the "page" is alive, rather than reconciled
 only on postback.
+
+---
+
+## Appendix: anatomy of an `@Injectable` class declaration
+
+§7 shows `TaskService` "in full." Worth taking apart the first two
+lines specifically, since more is happening there than it looks like
+coming from C#:
+
+```ts
+@Injectable({ providedIn: 'root' })
+export class TaskService {
+  private readonly http = inject(HttpClient);
+  ...
+}
+```
+
+**`export`** — plain TS/JS module scoping. By default a class defined
+in a file is only visible within that file; `export` makes it
+importable elsewhere (`import { TaskService } from './task.service'`).
+There's no `public`/`internal`/`private` spectrum like C# assembly
+visibility — it's binary: exported (importable) or not. The closest
+analogy is a `public class` in C#, except the boundary is "this file,"
+not "this assembly."
+
+**`@Injectable({ providedIn: 'root' })`** — this is a TypeScript
+**decorator**, a genuinely different mechanism from a C# attribute,
+not just similar-looking syntax. A C# attribute is inert metadata —
+something has to explicitly read it via reflection later. A TS
+decorator is a function that runs **at class-definition time** (when
+the module first loads) and is handed the class itself; it can attach
+metadata to it or replace it outright. For Angular specifically, its
+compiler (Ivy) statically processes `@Injectable`/`@Component` at
+*build* time and bakes the DI/component metadata directly into
+compiled output — so at runtime there's no reflection happening at
+all, unlike pre-Ivy Angular (and unlike C#'s attribute + reflection
+pattern, which is inherently runtime-based unless you're doing source
+generators).
+
+**The class body — no constructor, and why that's not a bug:**
+coming from C#, you'd expect DI to require a constructor parameter —
+`public TaskService(HttpClient http)`. This class has none. That works
+because in JS/TS, **field initializers run as the first statements of
+the constructor**, whether or not you wrote one explicitly — the
+compiler generates an implicit constructor whose body is just "run all
+the field initializers in order." So `private readonly http =
+inject(HttpClient);` executes during construction, exactly when
+Angular has an "active injection context" set up for building this
+instance. `inject()` reads from that ambient context — it's less like
+a normal function call and more like reading a thread-local that
+Angular sets right before calling `new TaskService()` and clears right
+after.
+
+That's also precisely why `inject()` throws if called anywhere else —
+a method invoked later, a `setTimeout` callback, an event handler — the
+ambient "currently constructing" context isn't active anymore by the
+time that code runs, so there's nothing for it to read from. It only
+works inside that narrow construction window (field initializers
+count; so does the top of an actual constructor if one is written).
+
+One more thing you'll see constantly in Angular tutorials/StackOverflow
+answers: the *older*, still fully valid style is ordinary
+constructor-parameter injection —
+
+```ts
+constructor(private http: HttpClient) {}
+```
+
+— Angular's direct equivalent of C# constructor injection, no
+ambient-context magic involved. `inject()` is the newer,
+field-initializer-friendly alternative this repo chose; they're
+functionally interchangeable, just different syntax for the same DI
+resolution.
