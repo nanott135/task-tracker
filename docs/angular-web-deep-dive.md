@@ -557,7 +557,8 @@ success, update the screen instantly for responsiveness, and only if
 the `error` callback fires, roll the local state back to the original
 `task` and show an error banner. There's no `next` callback here at
 all — on success, the optimistic update was already correct, so there's
-nothing left to do.
+nothing left to do. See the Appendix for a line-by-line walkthrough of
+this method.
 
 ---
 
@@ -820,3 +821,100 @@ ambient-context magic involved. `inject()` is the newer,
 field-initializer-friendly alternative this repo chose; they're
 functionally interchangeable, just different syntax for the same DI
 resolution.
+
+---
+
+## Appendix: `toggleDone`, line by line
+
+§7 calls out `toggleDone` as an optimistic-update pattern; this walks
+through why each line is written the way it is.
+
+```ts
+toggleDone(task: Task): void {
+  const updated = { ...task, isDone: !task.isDone };
+  this.tasks.update((tasks) => tasks.map((t) => (t.id === task.id ? updated : t)));
+
+  this.taskService
+    .update(task.id, { title: updated.title, description: updated.description,
+                        isDone: updated.isDone, dueDate: updated.dueDate })
+    .subscribe({
+      error: () => {
+        this.tasks.update((tasks) => tasks.map((t) => (t.id === task.id ? task : t)));
+        this.error.set('Could not update the task. Please try again.');
+      },
+    });
+}
+```
+
+**`toggleDone(task: Task): void`** — takes the specific `Task` object
+for the row that was clicked (bound in the template per §4's event
+binding) and returns nothing; the method manages its own subscription
+internally rather than returning an `Observable` for the caller to
+deal with.
+
+**`const updated = { ...task, isDone: !task.isDone };`** — the spread
+creates a **new object**, a shallow copy of `task` with `isDone`
+flipped, without mutating `task` itself. The closest C# equivalent is
+a record `with` expression (`task with { IsDone = !task.IsDone }`) —
+same immutable-update intent. That intent matters more here than it
+would in C#, for the reason in the next line.
+
+**`this.tasks.update((tasks) => tasks.map((t) => (t.id === task.id ? updated : t)));`**
+— the optimistic UI flip, and the reason the previous line had to
+build a new object instead of mutating in place. `tasks.map(...)`
+builds a **brand-new array**, swapping in `updated` for the matching
+element and passing every other element through unchanged.
+`signal.update(fn)` calls `fn` with the signal's current value and
+stores whatever it returns.
+
+The non-obvious part: Angular signals detect a change via reference
+equality (`Object.is`) by default. If this had instead mutated an
+element in place — `tasks()[i].isDone = true` — without producing a
+new array, the signal's stored reference would never change,
+`Object.is` would report no change, and **nothing would re-render**,
+even though the underlying data technically changed. The object spread
+and the `.map()` (which always returns a fresh array) aren't style
+preferences here — they're the mechanism that makes the signal notice
+anything happened at all.
+
+**`this.taskService.update(task.id, {...}).subscribe({...})`** —
+recall §7's laziness point: `.update()` just *builds* an
+`Observable<void>` describing a PUT request; nothing is sent until
+`.subscribe()` runs. So the real order of events is: (1) flip the
+object, (2) show the flipped state in the UI immediately via the
+signal update above, (3) *then* actually fire the PUT request. The UI
+has already changed before the network call has even been dispatched.
+
+**The object literal passed to `.update()`** — `{ title: ...,
+description: ..., isDone: ..., dueDate: ... }` — matches the
+`UpdateTask` shape from §6 (no `id`/`createdAt`). `updated` itself is a
+full `Task` (it has `id` and `createdAt` too, spread from `task`), and
+TypeScript's structural typing would actually allow passing `updated`
+directly here without complaint — it has every field `UpdateTask`
+needs, plus extras. The author rebuilt it explicitly anyway, mirroring
+the same discipline the root `CLAUDE.md` enforces server-side
+(controllers return DTOs, never raw entities): make the wire payload's
+shape explicit at the call site rather than relying on incidental
+structural compatibility to "just happen to work."
+
+**`.subscribe({ error: () => {...} })`** — only an `error` callback, no
+`next`. On success there's nothing left to do — the optimistic update
+already shows the correct end state, so a `next` handler would be
+empty anyway. Only failure needs a reaction.
+
+**Inside the error handler**, two things happen:
+- `this.tasks.update((tasks) => tasks.map((t) => (t.id === task.id ? task : t)));`
+  — the rollback. Same map-by-id-and-replace pattern as the optimistic
+  update, but swapping the **original** `task` back in (not
+  `updated`). This only works because `task` is captured by closure
+  from the method's parameter — even though this callback runs later,
+  asynchronously, after the PUT round-trip fails, it still refers to
+  the exact original object from when `toggleDone` was called, not
+  "whatever's currently in the signal."
+- `this.error.set('Could not update the task. Please try again.');` —
+  writes the same error-banner signal §4/§5 use for the initial load,
+  so the template can surface the failure.
+
+So the whole method is: optimistically mutate-by-replacement locally →
+fire the request → only touch state again if it fails, and when it
+does, undo using the pre-toggle object already sitting in the closure.
