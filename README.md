@@ -110,11 +110,11 @@ cd api && dotnet test   # xUnit, against an EF Core in-memory database
 cd web && ng test       # Vitest — components and TaskService
 ```
 
-## What I learned
+## What this project will teach you
 
-This project was as much about learning Angular as it was about building a
-task tracker — coming from an ASP.NET/EF Core background with almost no
-frontend experience. A few things that stood out:
+This project doubles as a hands-on tour of Angular for anyone coming from
+an ASP.NET/EF Core background with little frontend experience. A few
+things that stand out:
 
 - **Signals click faster than expected once you've used `INotifyPropertyChanged`.**
   `signal()` / computed state ended up feeling closer to a reactive view
@@ -133,12 +133,11 @@ frontend experience. A few things that stood out:
   something serializes oddly.
 - **Tooling permissions are worth reading closely.** The SQL Server MCP
   server has `execute_query` disabled by default behind an env var — a
-  deliberate high-risk gate, not a bug (see
-  [`docs/mcp-sqlserver-issues.md`](docs/mcp-sqlserver-issues.md)).
+  deliberate high-risk gate, not a bug.
 
 Deeper write-ups from working through both stacks:
 
 - [`docs/angular-web-deep-dive.md`](docs/angular-web-deep-dive.md) — the
   `/web` app, explained for an ASP.NET developer
 - [`docs/api-efcore-deep-dive.md`](docs/api-efcore-deep-dive.md) — EF Core,
-  explained for an ASP.NET Web API developer who's never used it
+  explained for an ASP.NET Web API developer without prior knowledge of it
