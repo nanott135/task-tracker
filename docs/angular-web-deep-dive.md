@@ -198,6 +198,35 @@ Angular equivalent of `InvalidOperationException: Unable to resolve
 service for type 'TaskService'` when a service was never added to
 `IServiceCollection`.
 
+### Other injection lifetimes — scoped, and the missing transient
+
+`providedIn: 'root'` is Angular's `AddSingleton<T>()`, but the mapping
+to ASP.NET Core's three lifetimes isn't 1:1. This repo only uses the
+singleton form, but it's worth knowing what else exists:
+
+- **Component-level providers** are the closest thing to "scoped."
+  Instead of `providedIn: 'root'` on the service, a component declares
+  `providers: [TaskService]` in its `@Component` decorator. That
+  creates a *new instance per component instance*, shared by that
+  component and its children, destroyed when the component is. The
+  gotcha: if the component renders multiple times (e.g. inside an
+  `@for` loop), **each rendered instance gets its own separate service
+  instance** — there's no ASP.NET Core equivalent to "scoped per
+  widget on the page." Think of it as scoped to a subtree of the
+  component tree, not to an HTTP request.
+- **Route-level providers** — a route config can declare its own
+  `providers: [...]`, scoping an instance to that route, torn down on
+  navigation away. Not relevant yet here since `app.routes.ts` (§1) is
+  currently an empty array — no routing is live in this repo.
+- **No true Transient exists.** There's no built-in "brand-new
+  instance on every `inject()` call" lifetime. Every injector (root, a
+  component's, a route's) resolves a token *once* and caches it for
+  everything downstream in that injector's scope — `inject()` always
+  returns "the cached instance for this scope," never a fresh one. If
+  you genuinely need a new object per call, the idiomatic pattern is
+  injecting a *factory* service (itself a singleton) whose method does
+  `new` internally, rather than relying on a lifetime setting.
+
 ---
 
 ## 4. Templates — the HTML side of a component
@@ -241,7 +270,9 @@ Combines property + event binding: the input's value initializes from
 what `FormsModule` (imported in `task-list.ts`'s `imports: [FormsModule,
 ...]`) provides — without importing `FormsModule`, `ngModel` isn't
 recognized in the template at all, the same way you'd get a compile
-error using a Tag Helper without its assembly referenced.
+error using a Tag Helper without its assembly referenced. See the
+Appendix for what `ngModel` actually is under the hood, including why
+it needs a `name` attribute inside a `<form>`.
 
 ### Control flow — `@if` / `@for`
 ```html
@@ -413,6 +444,10 @@ export class TaskService {
 }
 ```
 
+See the Appendix for a line-by-line anatomy of the `@Injectable`/
+`export class`/field-initializer declaration at the top of this file
+— including why there's no constructor.
+
 This is the repo's enforced convention (see root `CLAUDE.md`): **no
 component calls `HttpClient` directly** — everything routes through
 this typed service, mirroring why the API layer routes everything
@@ -522,7 +557,8 @@ success, update the screen instantly for responsiveness, and only if
 the `error` callback fires, roll the local state back to the original
 `task` and show an error banner. There's no `next` callback here at
 all — on success, the optimistic update was already correct, so there's
-nothing left to do.
+nothing left to do. See the Appendix for a line-by-line walkthrough of
+this method.
 
 ---
 
@@ -627,7 +663,8 @@ what makes the earlier `.subscribe()` callback actually fire — a
 concrete illustration of §7's laziness point: the request object exists
 after `expectOne`, but the `next` callback doesn't run until something
 supplies a response, exactly like nothing runs until `.subscribe()` is
-called in the first place.
+called in the first place. See the Appendix for a line-by-line
+walkthrough of this test, including why it needs no `async`/`await`.
 
 ---
 
@@ -660,3 +697,323 @@ Tying every section together — what happens when the page loads:
 11. Because the template reads `tasks()` inside `@for` (§4), Angular
     re-renders the list automatically — no manual DOM manipulation
     anywhere in this codebase.
+
+---
+
+## Appendix: `ngModel`, in more depth
+
+§4 introduces `[(ngModel)]` as two-way binding; this expands on what
+it actually is, since it's easy to use without understanding it.
+
+`ngModel` is a **directive** (not a component), shipped in
+`FormsModule`, that attaches to a native form element (`<input>`,
+`<select>`, `<textarea>`) and does two things at once:
+
+1. **Reads** the bound property into the control's value (`newTitle` →
+   the input's displayed text).
+2. **Writes** back on every user keystroke/change (typing → `newTitle`
+   gets updated).
+
+`[(ngModel)]="newTitle"` — the "banana in a box" syntax — is literally
+sugar for writing both bindings separately:
+
+```html
+[ngModel]="newTitle" (ngModelChange)="newTitle = $event"
+```
+
+**Why it needs `FormsModule` imported:** unlike `{{ }}` or `[ ]`/`( )`
+binding syntax, which are built into the template compiler, `ngModel`
+is a directive that has to be imported before the compiler recognizes
+the attribute at all. Skip the import and `[(ngModel)]` in a template
+is a compile error — the same way referencing a Tag Helper without its
+assembly reference fails.
+
+Two more things worth knowing:
+
+- `ngModel` is the **template-driven forms** approach. Angular's other
+  approach, **reactive forms**, builds the form model explicitly in
+  TypeScript (`FormGroup`/`FormControl`) instead of inferring it from
+  the template. This repo uses template-driven (`ngModel`) since the
+  add-task form is simple — reactive forms tend to be preferred once
+  you need validation logic, dynamic fields, or unit-testable form
+  state without a rendered DOM.
+- Inside a `<form>` (like `(ngSubmit)="addTask()"` in this repo), every
+  `ngModel`-bound input needs a `name` attribute
+  (`<input name="title" ... [(ngModel)]="newTitle" />`) — Angular's
+  template-driven forms track controls by name to build up an implicit
+  form model behind the scenes, and it throws a runtime error without
+  one.
+
+The closest ASP.NET-world analogy isn't Razor/Tag Helpers (those are
+request/response, not live) — it's closer to WPF/XAML's `{Binding
+Path=..., Mode=TwoWay}`: a control and a backing field kept
+continuously in sync while the "page" is alive, rather than reconciled
+only on postback.
+
+---
+
+## Appendix: anatomy of an `@Injectable` class declaration
+
+§7 shows `TaskService` "in full." Worth taking apart the first two
+lines specifically, since more is happening there than it looks like
+coming from C#:
+
+```ts
+@Injectable({ providedIn: 'root' })
+export class TaskService {
+  private readonly http = inject(HttpClient);
+  ...
+}
+```
+
+**`export`** — plain TS/JS module scoping. By default a class defined
+in a file is only visible within that file; `export` makes it
+importable elsewhere (`import { TaskService } from './task.service'`).
+There's no `public`/`internal`/`private` spectrum like C# assembly
+visibility — it's binary: exported (importable) or not. The closest
+analogy is a `public class` in C#, except the boundary is "this file,"
+not "this assembly."
+
+**`@Injectable({ providedIn: 'root' })`** — this is a TypeScript
+**decorator**, a genuinely different mechanism from a C# attribute,
+not just similar-looking syntax. A C# attribute is inert metadata —
+something has to explicitly read it via reflection later. A TS
+decorator is a function that runs **at class-definition time** (when
+the module first loads) and is handed the class itself; it can attach
+metadata to it or replace it outright. For Angular specifically, its
+compiler (Ivy) statically processes `@Injectable`/`@Component` at
+*build* time and bakes the DI/component metadata directly into
+compiled output — so at runtime there's no reflection happening at
+all, unlike pre-Ivy Angular (and unlike C#'s attribute + reflection
+pattern, which is inherently runtime-based unless you're doing source
+generators).
+
+**The class body — no constructor, and why that's not a bug:**
+coming from C#, you'd expect DI to require a constructor parameter —
+`public TaskService(HttpClient http)`. This class has none. That works
+because in JS/TS, **field initializers run as the first statements of
+the constructor**, whether or not you wrote one explicitly — the
+compiler generates an implicit constructor whose body is just "run all
+the field initializers in order." So `private readonly http =
+inject(HttpClient);` executes during construction, exactly when
+Angular has an "active injection context" set up for building this
+instance. `inject()` reads from that ambient context — it's less like
+a normal function call and more like reading a thread-local that
+Angular sets right before calling `new TaskService()` and clears right
+after.
+
+That's also precisely why `inject()` throws if called anywhere else —
+a method invoked later, a `setTimeout` callback, an event handler — the
+ambient "currently constructing" context isn't active anymore by the
+time that code runs, so there's nothing for it to read from. It only
+works inside that narrow construction window (field initializers
+count; so does the top of an actual constructor if one is written).
+
+One more thing you'll see constantly in Angular tutorials/StackOverflow
+answers: the *older*, still fully valid style is ordinary
+constructor-parameter injection —
+
+```ts
+constructor(private http: HttpClient) {}
+```
+
+— Angular's direct equivalent of C# constructor injection, no
+ambient-context magic involved. `inject()` is the newer,
+field-initializer-friendly alternative this repo chose; they're
+functionally interchangeable, just different syntax for the same DI
+resolution.
+
+---
+
+## Appendix: `toggleDone`, line by line
+
+§7 calls out `toggleDone` as an optimistic-update pattern; this walks
+through why each line is written the way it is.
+
+```ts
+toggleDone(task: Task): void {
+  const updated = { ...task, isDone: !task.isDone };
+  this.tasks.update((tasks) => tasks.map((t) => (t.id === task.id ? updated : t)));
+
+  this.taskService
+    .update(task.id, { title: updated.title, description: updated.description,
+                        isDone: updated.isDone, dueDate: updated.dueDate })
+    .subscribe({
+      error: () => {
+        this.tasks.update((tasks) => tasks.map((t) => (t.id === task.id ? task : t)));
+        this.error.set('Could not update the task. Please try again.');
+      },
+    });
+}
+```
+
+**`toggleDone(task: Task): void`** — takes the specific `Task` object
+for the row that was clicked (bound in the template per §4's event
+binding) and returns nothing; the method manages its own subscription
+internally rather than returning an `Observable` for the caller to
+deal with.
+
+**`const updated = { ...task, isDone: !task.isDone };`** — the spread
+creates a **new object**, a shallow copy of `task` with `isDone`
+flipped, without mutating `task` itself. The closest C# equivalent is
+a record `with` expression (`task with { IsDone = !task.IsDone }`) —
+same immutable-update intent. That intent matters more here than it
+would in C#, for the reason in the next line.
+
+**`this.tasks.update((tasks) => tasks.map((t) => (t.id === task.id ? updated : t)));`**
+— the optimistic UI flip, and the reason the previous line had to
+build a new object instead of mutating in place. `tasks.map(...)`
+builds a **brand-new array**, swapping in `updated` for the matching
+element and passing every other element through unchanged.
+`signal.update(fn)` calls `fn` with the signal's current value and
+stores whatever it returns.
+
+The non-obvious part: Angular signals detect a change via reference
+equality (`Object.is`) by default. If this had instead mutated an
+element in place — `tasks()[i].isDone = true` — without producing a
+new array, the signal's stored reference would never change,
+`Object.is` would report no change, and **nothing would re-render**,
+even though the underlying data technically changed. The object spread
+and the `.map()` (which always returns a fresh array) aren't style
+preferences here — they're the mechanism that makes the signal notice
+anything happened at all.
+
+**`this.taskService.update(task.id, {...}).subscribe({...})`** —
+recall §7's laziness point: `.update()` just *builds* an
+`Observable<void>` describing a PUT request; nothing is sent until
+`.subscribe()` runs. So the real order of events is: (1) flip the
+object, (2) show the flipped state in the UI immediately via the
+signal update above, (3) *then* actually fire the PUT request. The UI
+has already changed before the network call has even been dispatched.
+
+**The object literal passed to `.update()`** — `{ title: ...,
+description: ..., isDone: ..., dueDate: ... }` — matches the
+`UpdateTask` shape from §6 (no `id`/`createdAt`). `updated` itself is a
+full `Task` (it has `id` and `createdAt` too, spread from `task`), and
+TypeScript's structural typing would actually allow passing `updated`
+directly here without complaint — it has every field `UpdateTask`
+needs, plus extras. The author rebuilt it explicitly anyway, mirroring
+the same discipline the root `CLAUDE.md` enforces server-side
+(controllers return DTOs, never raw entities): make the wire payload's
+shape explicit at the call site rather than relying on incidental
+structural compatibility to "just happen to work."
+
+**`.subscribe({ error: () => {...} })`** — only an `error` callback, no
+`next`. On success there's nothing left to do — the optimistic update
+already shows the correct end state, so a `next` handler would be
+empty anyway. Only failure needs a reaction.
+
+**Inside the error handler**, two things happen:
+- `this.tasks.update((tasks) => tasks.map((t) => (t.id === task.id ? task : t)));`
+  — the rollback. Same map-by-id-and-replace pattern as the optimistic
+  update, but swapping the **original** `task` back in (not
+  `updated`). This only works because `task` is captured by closure
+  from the method's parameter — even though this callback runs later,
+  asynchronously, after the PUT round-trip fails, it still refers to
+  the exact original object from when `toggleDone` was called, not
+  "whatever's currently in the signal."
+- `this.error.set('Could not update the task. Please try again.');` —
+  writes the same error-banner signal §4/§5 use for the initial load,
+  so the template can surface the failure.
+
+So the whole method is: optimistically mutate-by-replacement locally →
+fire the request → only touch state again if it fails, and when it
+does, undo using the pre-toggle object already sitting in the closure.
+
+---
+
+## Appendix: the `getAll()` test, line by line
+
+§9 shows `task.service.spec.ts` testing `TaskService` in isolation.
+Worth going through the setup and the test body separately, since the
+setup answers "where do the dependencies come from" and the test
+answers "how does an async-looking call get asserted on
+synchronously."
+
+```ts
+beforeEach(() => {
+  TestBed.configureTestingModule({
+    providers: [provideHttpClient(), provideHttpClientTesting(), TaskService],
+  });
+  service = TestBed.inject(TaskService);
+  httpMock = TestBed.inject(HttpTestingController);
+});
+```
+
+**`TestBed.configureTestingModule({ providers: [...] })`** — builds a
+fresh, isolated DI container scoped to this test, the same role
+`WebApplicationFactory<T>` plays for an ASP.NET integration test (or
+manually `new`-ing a class with mocked constructor args for a plain
+unit test). Three providers, three separate jobs:
+
+- **`provideHttpClient()`** — registers the normal `HttpClient` setup.
+  It's still needed even though the next line replaces its backend —
+  `provideHttpClientTesting()` only swaps out the transport, not the
+  whole `HttpClient` registration.
+- **`provideHttpClientTesting()`** — replaces the real `HttpBackend`
+  (the thing that would issue an actual XHR/fetch) with a fake one,
+  and makes `HttpTestingController` available for the test to drive
+  that fake backend.
+- **`TaskService`** — listed explicitly here, but worth noticing this
+  is technically redundant: `TaskService` already declares
+  `@Injectable({ providedIn: 'root' })` (§7's Appendix), which means
+  `TestBed.inject(TaskService)` would resolve it anyway without being
+  listed. Listing it here is harmless and arguably good practice —  it
+  makes the test's dependencies self-documenting at the point of
+  setup — but it isn't load-bearing the way the two `provideHttpClient*`
+  calls are.
+
+**`service = TestBed.inject(TaskService);`** and **`httpMock =
+TestBed.inject(HttpTestingController);`** — pull concrete instances out
+of that test-scoped injector, the equivalent of resolving services
+from a `WebApplicationFactory`'s `IServiceProvider` in an ASP.NET
+integration test rather than constructing them by hand.
+
+```ts
+it('getAll() sends a GET to /api/tasks and returns the list', () => {
+  let result: Task[] | undefined;
+  service.getAll().subscribe((tasks) => (result = tasks));
+
+  const req = httpMock.expectOne('/api/tasks');
+  expect(req.request.method).toBe('GET');
+  req.flush([sampleTask]);        // <- fake server response
+
+  expect(result).toEqual([sampleTask]);
+});
+```
+
+**`let result: Task[] | undefined;`** — a plain variable the test
+writes into from inside the `.subscribe()` callback, so the assertion
+at the bottom has something to check. Not a signal, not a promise —
+just a closure variable, because everything here runs synchronously
+(see below).
+
+**`service.getAll().subscribe((tasks) => (result = tasks));`** — same
+two-step lazy pattern as §7: `getAll()` builds the `Observable`
+describing a GET, `.subscribe()` is what actually sends it — except
+here "sends it" means "hands it to the fake backend," not a real
+network call.
+
+**`const req = httpMock.expectOne('/api/tasks');`** — asserts that
+*exactly one* pending request matching that URL was made (failing the
+test immediately if zero or more than one match), and returns a handle
+to that pending request so the test can inspect and respond to it.
+
+**`expect(req.request.method).toBe('GET');`** — asserts on the request
+itself before answering it — confirming `TaskService.getAll()` really
+issued a GET, not e.g. a POST that happened to hit the same URL.
+
+**`req.flush([sampleTask]);`** — supplies the fake response body. This
+is the line that makes the `.subscribe()` callback above actually run.
+
+**`expect(result).toEqual([sampleTask]);`** — by the time this line
+executes, `result` has already been set. This is the detail worth
+sitting with if you're coming from `async`/`await` test methods:
+there's no `await`, no `done()` callback, no async test function here
+at all, even though `HttpClient`/`Observable` "feel" asynchronous in
+production. `HttpTestingController.flush()` is deliberately
+synchronous — it invokes the pending subscriber's `next` callback
+immediately, in the same call stack, rather than scheduling it onto a
+microtask queue the way a real network response would. That's what
+lets the whole test read top-to-bottom with plain synchronous
+assertions, despite testing code that's asynchronous in real usage.
