@@ -1,10 +1,9 @@
-# API Deep Dive: `/api`, for an ASP.NET Web API developer who's never used EF Core
+# API Deep Dive: `/api`, for an ASP.NET Web API developer
 
 This assumes you already know ASP.NET Web API cold — controllers,
-routing, DI, DTOs, middleware pipeline, `appsettings.json`. It does
-**not** assume any EF Core knowledge. Every section is built around one
-question: "if I were writing this with raw ADO.NET or Dapper, what is
-EF Core doing instead, and why?"
+routing, DI, DTOs, middleware pipeline, `appsettings.json`. Every
+section is built around one question: "if I were writing this with raw
+ADO.NET or Dapper, what is EF Core doing instead, and why?"
 
 ---
 
@@ -295,9 +294,9 @@ by the change tracker at all. The controller would still mutate
 `task.Title`, etc. in memory, but `SaveChangesAsync()` would find
 *nothing* dirty in the tracker and silently execute zero SQL. No
 exception, no error — the endpoint returns `204 No Content` (success)
-and the database is untouched. This is the sharpest edge in EF Core for
-someone new to it: tracked-vs-not is invisible at the call site unless
-you know to look for `AsNoTracking()`.
+and the database is untouched. This is the sharpest edge in EF Core:
+tracked-vs-not is invisible at the call site unless you know to look
+for `AsNoTracking()`.
 
 ---
 
@@ -324,7 +323,7 @@ becomes, roughly, `SELECT TOP(1) * FROM Tasks WHERE Id = @id` —
 parameterized automatically (no manual SQL injection risk the way
 string-concatenated ADO.NET/Dapper queries can have).
 
-**The catch that bites people new to EF:** not every C# expression can
+**The catch that trips people up:** not every C# expression can
 be translated to SQL. Call a C# method the SQL provider doesn't
 recognize inside a `Where`/`Select`, and you'll get a runtime exception
 (`could not be translated`) rather than a compile error — because the
