@@ -198,6 +198,35 @@ Angular equivalent of `InvalidOperationException: Unable to resolve
 service for type 'TaskService'` when a service was never added to
 `IServiceCollection`.
 
+### Other injection lifetimes — scoped, and the missing transient
+
+`providedIn: 'root'` is Angular's `AddSingleton<T>()`, but the mapping
+to ASP.NET Core's three lifetimes isn't 1:1. This repo only uses the
+singleton form, but it's worth knowing what else exists:
+
+- **Component-level providers** are the closest thing to "scoped."
+  Instead of `providedIn: 'root'` on the service, a component declares
+  `providers: [TaskService]` in its `@Component` decorator. That
+  creates a *new instance per component instance*, shared by that
+  component and its children, destroyed when the component is. The
+  gotcha: if the component renders multiple times (e.g. inside an
+  `@for` loop), **each rendered instance gets its own separate service
+  instance** — there's no ASP.NET Core equivalent to "scoped per
+  widget on the page." Think of it as scoped to a subtree of the
+  component tree, not to an HTTP request.
+- **Route-level providers** — a route config can declare its own
+  `providers: [...]`, scoping an instance to that route, torn down on
+  navigation away. Not relevant yet here since `app.routes.ts` (§1) is
+  currently an empty array — no routing is live in this repo.
+- **No true Transient exists.** There's no built-in "brand-new
+  instance on every `inject()` call" lifetime. Every injector (root, a
+  component's, a route's) resolves a token *once* and caches it for
+  everything downstream in that injector's scope — `inject()` always
+  returns "the cached instance for this scope," never a fresh one. If
+  you genuinely need a new object per call, the idiomatic pattern is
+  injecting a *factory* service (itself a singleton) whose method does
+  `new` internally, rather than relying on a lifetime setting.
+
 ---
 
 ## 4. Templates — the HTML side of a component
@@ -241,7 +270,9 @@ Combines property + event binding: the input's value initializes from
 what `FormsModule` (imported in `task-list.ts`'s `imports: [FormsModule,
 ...]`) provides — without importing `FormsModule`, `ngModel` isn't
 recognized in the template at all, the same way you'd get a compile
-error using a Tag Helper without its assembly referenced.
+error using a Tag Helper without its assembly referenced. See the
+Appendix for what `ngModel` actually is under the hood, including why
+it needs a `name` attribute inside a `<form>`.
 
 ### Control flow — `@if` / `@for`
 ```html
@@ -660,3 +691,55 @@ Tying every section together — what happens when the page loads:
 11. Because the template reads `tasks()` inside `@for` (§4), Angular
     re-renders the list automatically — no manual DOM manipulation
     anywhere in this codebase.
+
+---
+
+## Appendix: `ngModel`, in more depth
+
+§4 introduces `[(ngModel)]` as two-way binding; this expands on what
+it actually is, since it's easy to use without understanding it.
+
+`ngModel` is a **directive** (not a component), shipped in
+`FormsModule`, that attaches to a native form element (`<input>`,
+`<select>`, `<textarea>`) and does two things at once:
+
+1. **Reads** the bound property into the control's value (`newTitle` →
+   the input's displayed text).
+2. **Writes** back on every user keystroke/change (typing → `newTitle`
+   gets updated).
+
+`[(ngModel)]="newTitle"` — the "banana in a box" syntax — is literally
+sugar for writing both bindings separately:
+
+```html
+[ngModel]="newTitle" (ngModelChange)="newTitle = $event"
+```
+
+**Why it needs `FormsModule` imported:** unlike `{{ }}` or `[ ]`/`( )`
+binding syntax, which are built into the template compiler, `ngModel`
+is a directive that has to be imported before the compiler recognizes
+the attribute at all. Skip the import and `[(ngModel)]` in a template
+is a compile error — the same way referencing a Tag Helper without its
+assembly reference fails.
+
+Two more things worth knowing:
+
+- `ngModel` is the **template-driven forms** approach. Angular's other
+  approach, **reactive forms**, builds the form model explicitly in
+  TypeScript (`FormGroup`/`FormControl`) instead of inferring it from
+  the template. This repo uses template-driven (`ngModel`) since the
+  add-task form is simple — reactive forms tend to be preferred once
+  you need validation logic, dynamic fields, or unit-testable form
+  state without a rendered DOM.
+- Inside a `<form>` (like `(ngSubmit)="addTask()"` in this repo), every
+  `ngModel`-bound input needs a `name` attribute
+  (`<input name="title" ... [(ngModel)]="newTitle" />`) — Angular's
+  template-driven forms track controls by name to build up an implicit
+  form model behind the scenes, and it throws a runtime error without
+  one.
+
+The closest ASP.NET-world analogy isn't Razor/Tag Helpers (those are
+request/response, not live) — it's closer to WPF/XAML's `{Binding
+Path=..., Mode=TwoWay}`: a control and a backing field kept
+continuously in sync while the "page" is alive, rather than reconciled
+only on postback.
