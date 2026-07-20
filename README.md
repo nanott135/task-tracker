@@ -1,8 +1,15 @@
 # Task Tracker
 
+🤖 Built with [Claude Code](https://claude.com/claude-code)
+
 A small full-stack task tracker — ASP.NET Core Web API backend, Angular
 frontend, SQL Server database — built as a hands-on way to learn Angular
 from an ASP.NET/EF Core background.
+
+This project was built by following
+[`tutorial-github-or-azure.html`](tutorial-github-or-azure.html), a
+walkthrough for standing up a full-stack project with Claude Code against
+either GitHub or Azure DevOps, the tutorial itself was also built with Claude.
 
 ![Task Tracker screenshot](docs/screenshot.png)
 
