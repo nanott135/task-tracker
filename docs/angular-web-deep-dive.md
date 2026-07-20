@@ -663,7 +663,8 @@ what makes the earlier `.subscribe()` callback actually fire — a
 concrete illustration of §7's laziness point: the request object exists
 after `expectOne`, but the `next` callback doesn't run until something
 supplies a response, exactly like nothing runs until `.subscribe()` is
-called in the first place.
+called in the first place. See the Appendix for a line-by-line
+walkthrough of this test, including why it needs no `async`/`await`.
 
 ---
 
@@ -918,3 +919,101 @@ empty anyway. Only failure needs a reaction.
 So the whole method is: optimistically mutate-by-replacement locally →
 fire the request → only touch state again if it fails, and when it
 does, undo using the pre-toggle object already sitting in the closure.
+
+---
+
+## Appendix: the `getAll()` test, line by line
+
+§9 shows `task.service.spec.ts` testing `TaskService` in isolation.
+Worth going through the setup and the test body separately, since the
+setup answers "where do the dependencies come from" and the test
+answers "how does an async-looking call get asserted on
+synchronously."
+
+```ts
+beforeEach(() => {
+  TestBed.configureTestingModule({
+    providers: [provideHttpClient(), provideHttpClientTesting(), TaskService],
+  });
+  service = TestBed.inject(TaskService);
+  httpMock = TestBed.inject(HttpTestingController);
+});
+```
+
+**`TestBed.configureTestingModule({ providers: [...] })`** — builds a
+fresh, isolated DI container scoped to this test, the same role
+`WebApplicationFactory<T>` plays for an ASP.NET integration test (or
+manually `new`-ing a class with mocked constructor args for a plain
+unit test). Three providers, three separate jobs:
+
+- **`provideHttpClient()`** — registers the normal `HttpClient` setup.
+  It's still needed even though the next line replaces its backend —
+  `provideHttpClientTesting()` only swaps out the transport, not the
+  whole `HttpClient` registration.
+- **`provideHttpClientTesting()`** — replaces the real `HttpBackend`
+  (the thing that would issue an actual XHR/fetch) with a fake one,
+  and makes `HttpTestingController` available for the test to drive
+  that fake backend.
+- **`TaskService`** — listed explicitly here, but worth noticing this
+  is technically redundant: `TaskService` already declares
+  `@Injectable({ providedIn: 'root' })` (§7's Appendix), which means
+  `TestBed.inject(TaskService)` would resolve it anyway without being
+  listed. Listing it here is harmless and arguably good practice —  it
+  makes the test's dependencies self-documenting at the point of
+  setup — but it isn't load-bearing the way the two `provideHttpClient*`
+  calls are.
+
+**`service = TestBed.inject(TaskService);`** and **`httpMock =
+TestBed.inject(HttpTestingController);`** — pull concrete instances out
+of that test-scoped injector, the equivalent of resolving services
+from a `WebApplicationFactory`'s `IServiceProvider` in an ASP.NET
+integration test rather than constructing them by hand.
+
+```ts
+it('getAll() sends a GET to /api/tasks and returns the list', () => {
+  let result: Task[] | undefined;
+  service.getAll().subscribe((tasks) => (result = tasks));
+
+  const req = httpMock.expectOne('/api/tasks');
+  expect(req.request.method).toBe('GET');
+  req.flush([sampleTask]);        // <- fake server response
+
+  expect(result).toEqual([sampleTask]);
+});
+```
+
+**`let result: Task[] | undefined;`** — a plain variable the test
+writes into from inside the `.subscribe()` callback, so the assertion
+at the bottom has something to check. Not a signal, not a promise —
+just a closure variable, because everything here runs synchronously
+(see below).
+
+**`service.getAll().subscribe((tasks) => (result = tasks));`** — same
+two-step lazy pattern as §7: `getAll()` builds the `Observable`
+describing a GET, `.subscribe()` is what actually sends it — except
+here "sends it" means "hands it to the fake backend," not a real
+network call.
+
+**`const req = httpMock.expectOne('/api/tasks');`** — asserts that
+*exactly one* pending request matching that URL was made (failing the
+test immediately if zero or more than one match), and returns a handle
+to that pending request so the test can inspect and respond to it.
+
+**`expect(req.request.method).toBe('GET');`** — asserts on the request
+itself before answering it — confirming `TaskService.getAll()` really
+issued a GET, not e.g. a POST that happened to hit the same URL.
+
+**`req.flush([sampleTask]);`** — supplies the fake response body. This
+is the line that makes the `.subscribe()` callback above actually run.
+
+**`expect(result).toEqual([sampleTask]);`** — by the time this line
+executes, `result` has already been set. This is the detail worth
+sitting with if you're coming from `async`/`await` test methods:
+there's no `await`, no `done()` callback, no async test function here
+at all, even though `HttpClient`/`Observable` "feel" asynchronous in
+production. `HttpTestingController.flush()` is deliberately
+synchronous — it invokes the pending subscriber's `next` callback
+immediately, in the same call stack, rather than scheduling it onto a
+microtask queue the way a real network response would. That's what
+lets the whole test read top-to-bottom with plain synchronous
+assertions, despite testing code that's asynchronous in real usage.
