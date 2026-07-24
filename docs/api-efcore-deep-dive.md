@@ -63,7 +63,8 @@ few naming conventions:
   database assigns it, and EF reads it back into the object after
   insert (visible in `CreatedAtAction(nameof(GetById), new { id =
   task.Id }, ...)` — `task.Id` is populated *after* `SaveChangesAsync()`
-  returns, not before).
+  returns, not before). See the Appendix for how `CreatedAtAction`
+  itself builds the response.
 
 There's no `[Table("Tasks")]` attribute either — the table name comes
 from the `DbSet` property name in the `DbContext` (§2), pluralization
@@ -218,7 +219,9 @@ snapshot), never **model-vs-live-database**. That's exactly why
 in SQL Server Management Studio, the snapshot file has no idea that
 happened. The next `migrations add` will diff against the stale
 snapshot, not your actual schema, and generate a migration that's wrong
-relative to reality — EF has no way to detect the drift.
+relative to reality — EF has no way to detect the drift. See the
+Appendix for exactly when and how that drift actually surfaces as a
+failure.
 
 You verified this "no drift" state directly earlier in this project — the
 live `Tasks` table matched `TaskDbContextModelSnapshot.cs` and
@@ -332,7 +335,9 @@ can express your LINQ in T-SQL. This codebase's queries are simple
 enough (equality filters, direct property projection) that this never
 comes up, but it's the reason EF LINQ isn't "just C# that happens to
 run on a database" — it's closer to "a C#-shaped query language that
-gets recompiled to SQL, with a smaller surface than full C#."
+gets recompiled to SQL, with a smaller surface than full C#." See the
+Appendix for a concrete example of a method call that fails to
+translate, and why `Select(t => ToDto(t))` above is different.
 
 `FindAsync(id)` (used in `Update`/`Delete`) is a shortcut, not a LINQ
 query — it looks up by **primary key** specifically, and it first
@@ -340,7 +345,8 @@ checks whether an entity with that key is *already tracked in this
 context* before hitting the database at all. For a single call per
 request like here, that distinction rarely matters; it matters more in
 code that calls `FindAsync` on the same ID multiple times within one
-request.
+request. See the Appendix for what that identity-map check actually
+does and where it bites.
 
 ---
 
@@ -485,3 +491,322 @@ And the schema all of this depends on didn't come from anyone running
 `ALTER TABLE` — it came from `TaskItem.cs`'s shape, frozen into
 `20260711111314_InitialCreate.cs` via `dotnet ef migrations add`, and
 applied to the real database via `dotnet ef database update` (§3).
+
+---
+
+## Appendix: `CreatedAtAction` and the create-response idiom
+
+`CreatedAtAction` is the idiom ASP.NET Web API controllers use to satisfy
+the part of HTTP semantics that a plain `Ok()` or even a bare `201`
+alone doesn't cover: when a POST creates a resource, the response must
+carry both a `201` status *and* a `Location` header pointing at where
+that resource can now be `GET`-ed. `CreatedAtAction` builds both pieces
+for you instead of you hand-assembling them.
+
+```csharp
+db.Tasks.Add(task);
+await db.SaveChangesAsync();
+return CreatedAtAction(nameof(GetById), new { id = task.Id }, ToDto(task));
+```
+
+**What it actually returns.** It's a factory method on `ControllerBase`
+that produces a `CreatedAtActionResult` (an `ObjectResult` subtype).
+Three things happen when it executes:
+
+1. Status code is forced to `201`.
+2. The third argument (`ToDto(task)`) becomes the response body,
+   serialized the normal way (JSON via the configured formatter) — same
+   as if you'd called `Ok(ToDto(task))`.
+3. The `Location` header is computed by asking the routing system to
+   reverse-generate a URL for the action named in the first argument,
+   using the route values in the second.
+
+That third step is the interesting one, and it's where this differs
+from just calling `Created(uri, value)` with a string you built
+yourself.
+
+**How the URL actually gets generated.** Under the hood,
+`CreatedAtActionResult.ExecuteResultAsync` grabs an `IUrlHelper` for the
+current request and calls the equivalent of `Url.Action("GetById",
+routeValues: new { id = task.Id })`. `IUrlHelper` doesn't string-format
+a URL — it walks the same attribute-routing metadata the framework
+built at startup from `[Route("api/tasks")]` on the controller and
+`[HttpGet("{id:int}")]` on `GetById`, finds the action whose route
+template's required parameters (`id`) are satisfiable by the values you
+supplied, and *reverses* the template into a concrete path:
+`/api/tasks/7`. It's routing run backwards — the same mechanism,
+inverted.
+
+Two consequences fall out of that:
+
+- **It's always in sync with the real route.** If someone later changes
+  `GetById`'s route to `[HttpGet("{id:int}/details")]`, the generated
+  `Location` header updates automatically — nothing to remember to fix,
+  unlike `Created("/api/tasks/" + task.Id, ...)`, which would silently
+  start lying.
+- **It can fail at runtime, not compile time.** If the route values you
+  pass don't satisfy the target action's route constraints (e.g., a
+  value for a parameter that doesn't exist, or a missing required one),
+  link generation throws `InvalidOperationException: No route matches
+  the supplied values` when the result executes — you won't see it
+  until you actually hit the endpoint. In this codebase that's a
+  non-issue since `id` maps 1:1 to `GetById`'s `{id:int}`, but it's the
+  sharp edge to know about.
+
+**Why `nameof(GetById)` instead of the string `"GetById"`.** This is the
+one piece of the four arguments that *is* compile-time checked. `nameof`
+resolves against the actual method symbol, so renaming `GetById` breaks
+the build at the `CreatedAtAction` call site instead of silently
+generating a `Location` header that 404s. The route values and the URL
+itself remain runtime-resolved regardless — `nameof` only protects the
+action-name string.
+
+**Why no controller name here.** `CreatedAtAction` has an overload
+`(actionName, controllerName, routeValues, value)`. This call uses the
+3-arg version, which implicitly targets the *current* controller
+(`TasksController`) via the current `ActionContext`. You'd supply
+`controllerName` explicitly only if `GetById` lived on a different
+controller than `Create`.
+
+**Location header shape.** By default `Url.Action(...)` without an
+explicit protocol produces a path-relative URL, not an absolute one —
+so the header here would be `/api/tasks/7`, not
+`http://localhost:5189/api/tasks/7`. That's spec-legal (HTTP allows
+`Location` to be a relative reference resolved against the request's
+effective URI) and is what you'll see if you inspect the response in
+Swagger or a test.
+
+**The broader idiom.** `return CreatedAtAction(nameof(Get), new { id },
+dto)` is the canonical shape for every REST-ful POST-creates-a-resource
+endpoint in ASP.NET Core — you'll see it (or its minimal-API cousin
+`TypedResults.CreatedAtRoute`) any time a controller creates something
+and wants to both hand back the created representation *and* point the
+client at its canonical URL in one round trip, saving the client an
+immediate follow-up `GET`.
+
+---
+
+## Appendix: what actually happens when the model and the live database drift
+
+§3 states the rule — EF's migration diffing is model-vs-model, never
+model-vs-live-database — but it's worth tracing through concretely what
+happens if someone manually adds a column to `Tasks` in SQL Server
+Management Studio instead of going through `TaskItem.cs`. The honest
+answer is: **not a problem immediately, and that's exactly what makes it
+dangerous.** The failure is deferred to a specific, later point, not the
+moment the drift is introduced.
+
+**Step 1 — `dotnet ef migrations add SomeChangeName` never touches the
+live database at all.** It loads `TaskDbContextModelSnapshot.cs` (what
+the C# model looked like as of the last migration) and compares it
+against the *current* `TaskItem.cs`. There is no code path here that
+opens a connection to `TaskTrackerDb` and inspects `sys.columns` or
+anything like it. If the manually-added column has no corresponding C#
+property, this step cannot see it — not because it's failing to notice,
+but because the "database" side of the comparison is a frozen C#
+snapshot, not the real database.
+
+If nothing else changed in `TaskItem.cs`, this command produces a
+migration with **empty `Up()`/`Down()` bodies** — EF found zero
+differences between the model and the snapshot, so there's nothing to
+generate. No error, no warning about the manual column.
+
+**Step 2 — `dotnet ef database update` also doesn't diff against live
+schema.** Its only interaction with the database's actual shape is
+reading the `__EFMigrationsHistory` bookkeeping table to see which
+migration IDs are already recorded as applied, then running the `Up()`
+of whatever isn't. It executes SQL blindly based on what the migration
+file says to do — it doesn't first check "does this column already
+exist?" So in the empty-migration case above, this step just inserts a
+row into `__EFMigrationsHistory` and runs nothing. Still no conflict.
+The manual column and the untouched model now coexist indefinitely — EF
+never queries or writes that column, since no C# property maps to it.
+It's inert from EF's perspective, even though the data is still sitting
+there in SQL Server.
+
+**Where it actually breaks.** The failure is deferred until someone
+adds a C# property that happens to target the *same column name* the
+manual `ALTER TABLE` already created — for example, someone later
+notices the manual column and, unaware it already exists physically,
+adds `public string Notes { get; set; }` to `TaskItem` to "properly"
+model it, then runs `migrations add`. Now the model-vs-snapshot diff
+*does* see a difference (the snapshot has no `Notes`, the current model
+does) and generates a real `AddColumn` operation for it. `migrations
+add` still succeeds — it's still just an offline diff — but when
+`dotnet ef database update` runs, SQL Server executes the generated
+`ALTER TABLE [Tasks] ADD [Notes] nvarchar(max) NULL` against a table
+that **already has** a `Notes` column, and that fails hard, at apply
+time, with a raw SQL Server error along the lines of:
+
+```
+There is already an object named 'Notes' or the column names in table 'Tasks' are not unique.
+```
+
+The migration only partially applies (EF Core wraps each migration in a
+transaction by default for SQL Server, so it rolls back cleanly rather
+than leaving a half-applied schema), `__EFMigrationsHistory` doesn't get
+the new row, and you're stuck until you either drop the manual column,
+edit the generated migration to skip the `AddColumn` call, or otherwise
+reconcile the two by hand.
+
+**The broader point.** Vanilla EF Core CLI tooling has no built-in
+"verify live schema matches model" command at all — nothing analogous
+to `terraform plan` against real infrastructure. `Database.
+GetPendingMigrationsAsync()` and similar APIs only compare *migration
+history records*, not actual column-level schema. This class of bug is
+entirely on the humans (or automation) to avoid by disciplined use of
+`dotnet ef migrations add` for every schema change — which is precisely
+the rule `api/CLAUDE.md` states.
+
+---
+
+## Appendix: a concrete "could not be translated" failure
+
+§5 warns that not every C# expression can be translated to SQL, but the
+codebase's own example — `Select(t => ToDto(t))` in `GetAll()` — is
+itself a method call inside a query, which raises the obvious question:
+why does *that* one work?
+
+**Why `ToDto(t)` works.** `ToDto` is a single-expression method that
+does nothing but return `new TaskDto { Prop = task.Prop, ... }` — a
+member initializer built entirely from scalar properties of the
+parameter. EF Core's translator can inline that shape: it treats the
+call as equivalent to writing the object initializer directly in the
+`Select`, then translates each member access normally. This works
+specifically because the method body is *one expression*, with no
+branching and no calls to anything EF doesn't already know how to
+translate.
+
+**A concrete example that fails.** Add a helper with actual control
+flow — say, "is this task due soon":
+
+```csharp
+private static bool IsUrgent(TaskItem task)
+{
+    if (!task.DueDate.HasValue) return false;
+    var daysUntilDue = (task.DueDate.Value - DateTime.UtcNow).TotalDays;
+    return daysUntilDue is >= 0 and <= 2;
+}
+```
+
+and use it in a query:
+
+```csharp
+var urgent = await db.Tasks.AsNoTracking().Where(t => IsUrgent(t)).ToListAsync();
+```
+
+This throws at runtime, not compile time — `Where(Expression<Func<
+TaskItem, bool>>)` type-checks fine, since the compiler only needs
+`IsUrgent(t)` to be a valid method call returning `bool`. The failure
+only shows up when the query actually executes:
+
+```
+System.InvalidOperationException: The LINQ expression 'DbSet<TaskItem>()
+    .Where(t => IsUrgent(t))' could not be translated. Either rewrite
+the query in a form that can be translated, or switch to client
+evaluation explicitly by inserting a call to 'AsEnumerable', 'AsAsyncEnumerable',
+'ToList', or 'ToListAsync'. See https://go.microsoft.com/fwlink/?linkid=2101038
+for more information.
+```
+
+**Why this one can't be inlined where `ToDto` could.** `IsUrgent` has an
+`if` statement, an intermediate local variable, and a `return` inside a
+conditional block — it's not a single expression. There's no
+C#-to-SQL mapping for "branch and return early"; T-SQL has no
+equivalent of arbitrary imperative control flow inside a `WHERE`
+clause the way EF's translator understands it. Individual pieces like
+`DateTime.Subtract` and `.TotalDays` *are* individually translatable,
+but the method as a whole isn't a recognized BCL member or an EF
+`DbFunction`, so the translator has nothing to fall back to and gives
+up entirely — for the whole `Where`, not just the unrecognized part.
+
+**The fix** is to either inline the logic as pure LINQ so every piece is
+individually translatable:
+
+```csharp
+var urgent = await db.Tasks.AsNoTracking()
+    .Where(t => t.DueDate.HasValue
+             && t.DueDate.Value >= DateTime.UtcNow
+             && t.DueDate.Value <= DateTime.UtcNow.AddDays(2))
+    .ToListAsync();
+```
+
+or force client evaluation by materializing first
+(`.AsEnumerable().Where(t => IsUrgent(t))`) — which works but pulls
+every row into memory before filtering, defeating the point of
+filtering in the database at all.
+
+---
+
+## Appendix: what `FindAsync`'s identity-map check actually does
+
+§5 mentions that `FindAsync` checks whether an entity is already
+tracked before hitting the database — that's EF Core's **identity map**,
+and it's worth being precise about what it does and when it bites,
+because it behaves nothing like a Dapper/ADO.NET query re-run.
+
+**What `FindAsync` actually checks.** The `ChangeTracker` isn't just a
+list of "entities I've loaded" — internally it's keyed by `(entity
+type, primary key value)`. `FindAsync(id)` looks up that key in the
+tracker's internal dictionary *before* doing anything else. If an
+entity with that key is already tracked in this `DbContext` instance,
+it returns that exact same object reference immediately — zero SQL
+sent, no round trip to SQL Server at all. Only on a miss does it fall
+back to issuing `SELECT * FROM Tasks WHERE Id = @id` and registering
+the result.
+
+This is fundamentally different from `FirstOrDefaultAsync(t => t.Id ==
+id)`, which is a generic LINQ query — it has no concept of "have I
+already loaded this row," so it unconditionally sends a query to the
+database every single time, tracked or not. `Find`/`FindAsync` are the
+only APIs in EF Core with this short-circuit behavior; it's tied
+specifically to primary-key lookups.
+
+**Why a single call per request makes it invisible here.** `Update()`
+and `Delete()` in `TasksController` each call `FindAsync(id)` exactly
+once. On a fresh, scoped `DbContext` (one per HTTP request, per §2),
+the tracker starts empty, so that single call is always a cache miss —
+it always hits the database. The identity-map behavior exists, but it
+never has a second call in the same request to actually short-circuit
+against, so functionally it behaves indistinguishably from "just query
+by PK."
+
+**Where it would actually matter — a concrete scenario.** Imagine code
+(not in this repo, but plausible) that calls `FindAsync` twice in one
+request — say, an authorization check followed by the actual update
+logic:
+
+```csharp
+var existing = await db.Tasks.FindAsync(id);      // (1) SELECT sent, entity tracked
+if (existing is null) return NotFound();
+
+// ...some other logic...
+
+var task = await db.Tasks.FindAsync(id);           // (2) cache hit — no SQL at all
+task.Title = dto.Title;
+```
+
+Call (2) returns the *literal same object reference* as call (1) — not
+a fresh copy, not a fresh row read. Two consequences fall out of that,
+both surprising if you're used to Dapper/ADO.NET where every query is a
+fresh round trip returning a fresh object:
+
+1. **No second database hit**, even though the code reads as if it's
+   querying again. If you were watching SQL Server Profiler or EF's
+   logging, you'd see one `SELECT`, not two — which can be confusing
+   when you're trying to account for query counts.
+2. **You get back whatever's currently in memory, including uncommitted
+   mutations.** If something between calls (1) and (2) had already
+   mutated `existing.Title` without calling `SaveChangesAsync()` yet,
+   call (2)'s `task.Title` would reflect that *unsaved* in-memory
+   change, not what's actually persisted in `Tasks` right now.
+   `FindAsync` never re-reads from the database once an entity is
+   tracked — it trusts the tracker over the database.
+
+That second point is the real trap: `FindAsync` is not "get current DB
+state by key," it's "get the tracked instance for this key if one
+exists, otherwise get current DB state by key." Those are the same
+thing only on a cache miss. And because the identity map lives on the
+`DbContext` instance, and that instance is scoped per request (§2), the
+map's lifetime is bounded to a single request too — it never leaks
+stale entities across requests, only within one.
