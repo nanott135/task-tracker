@@ -63,7 +63,8 @@ few naming conventions:
   database assigns it, and EF reads it back into the object after
   insert (visible in `CreatedAtAction(nameof(GetById), new { id =
   task.Id }, ...)` — `task.Id` is populated *after* `SaveChangesAsync()`
-  returns, not before).
+  returns, not before). See the Appendix for how `CreatedAtAction`
+  itself builds the response.
 
 There's no `[Table("Tasks")]` attribute either — the table name comes
 from the `DbSet` property name in the `DbContext` (§2), pluralization
@@ -485,3 +486,95 @@ And the schema all of this depends on didn't come from anyone running
 `ALTER TABLE` — it came from `TaskItem.cs`'s shape, frozen into
 `20260711111314_InitialCreate.cs` via `dotnet ef migrations add`, and
 applied to the real database via `dotnet ef database update` (§3).
+
+---
+
+## Appendix: `CreatedAtAction` and the create-response idiom
+
+`CreatedAtAction` is the idiom ASP.NET Web API controllers use to satisfy
+the part of HTTP semantics that a plain `Ok()` or even a bare `201`
+alone doesn't cover: when a POST creates a resource, the response must
+carry both a `201` status *and* a `Location` header pointing at where
+that resource can now be `GET`-ed. `CreatedAtAction` builds both pieces
+for you instead of you hand-assembling them.
+
+```csharp
+db.Tasks.Add(task);
+await db.SaveChangesAsync();
+return CreatedAtAction(nameof(GetById), new { id = task.Id }, ToDto(task));
+```
+
+**What it actually returns.** It's a factory method on `ControllerBase`
+that produces a `CreatedAtActionResult` (an `ObjectResult` subtype).
+Three things happen when it executes:
+
+1. Status code is forced to `201`.
+2. The third argument (`ToDto(task)`) becomes the response body,
+   serialized the normal way (JSON via the configured formatter) — same
+   as if you'd called `Ok(ToDto(task))`.
+3. The `Location` header is computed by asking the routing system to
+   reverse-generate a URL for the action named in the first argument,
+   using the route values in the second.
+
+That third step is the interesting one, and it's where this differs
+from just calling `Created(uri, value)` with a string you built
+yourself.
+
+**How the URL actually gets generated.** Under the hood,
+`CreatedAtActionResult.ExecuteResultAsync` grabs an `IUrlHelper` for the
+current request and calls the equivalent of `Url.Action("GetById",
+routeValues: new { id = task.Id })`. `IUrlHelper` doesn't string-format
+a URL — it walks the same attribute-routing metadata the framework
+built at startup from `[Route("api/tasks")]` on the controller and
+`[HttpGet("{id:int}")]` on `GetById`, finds the action whose route
+template's required parameters (`id`) are satisfiable by the values you
+supplied, and *reverses* the template into a concrete path:
+`/api/tasks/7`. It's routing run backwards — the same mechanism,
+inverted.
+
+Two consequences fall out of that:
+
+- **It's always in sync with the real route.** If someone later changes
+  `GetById`'s route to `[HttpGet("{id:int}/details")]`, the generated
+  `Location` header updates automatically — nothing to remember to fix,
+  unlike `Created("/api/tasks/" + task.Id, ...)`, which would silently
+  start lying.
+- **It can fail at runtime, not compile time.** If the route values you
+  pass don't satisfy the target action's route constraints (e.g., a
+  value for a parameter that doesn't exist, or a missing required one),
+  link generation throws `InvalidOperationException: No route matches
+  the supplied values` when the result executes — you won't see it
+  until you actually hit the endpoint. In this codebase that's a
+  non-issue since `id` maps 1:1 to `GetById`'s `{id:int}`, but it's the
+  sharp edge to know about.
+
+**Why `nameof(GetById)` instead of the string `"GetById"`.** This is the
+one piece of the four arguments that *is* compile-time checked. `nameof`
+resolves against the actual method symbol, so renaming `GetById` breaks
+the build at the `CreatedAtAction` call site instead of silently
+generating a `Location` header that 404s. The route values and the URL
+itself remain runtime-resolved regardless — `nameof` only protects the
+action-name string.
+
+**Why no controller name here.** `CreatedAtAction` has an overload
+`(actionName, controllerName, routeValues, value)`. This call uses the
+3-arg version, which implicitly targets the *current* controller
+(`TasksController`) via the current `ActionContext`. You'd supply
+`controllerName` explicitly only if `GetById` lived on a different
+controller than `Create`.
+
+**Location header shape.** By default `Url.Action(...)` without an
+explicit protocol produces a path-relative URL, not an absolute one —
+so the header here would be `/api/tasks/7`, not
+`http://localhost:5189/api/tasks/7`. That's spec-legal (HTTP allows
+`Location` to be a relative reference resolved against the request's
+effective URI) and is what you'll see if you inspect the response in
+Swagger or a test.
+
+**The broader idiom.** `return CreatedAtAction(nameof(Get), new { id },
+dto)` is the canonical shape for every REST-ful POST-creates-a-resource
+endpoint in ASP.NET Core — you'll see it (or its minimal-API cousin
+`TypedResults.CreatedAtRoute`) any time a controller creates something
+and wants to both hand back the created representation *and* point the
+client at its canonical URL in one round trip, saving the client an
+immediate follow-up `GET`.
