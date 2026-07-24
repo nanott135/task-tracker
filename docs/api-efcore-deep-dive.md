@@ -345,7 +345,8 @@ checks whether an entity with that key is *already tracked in this
 context* before hitting the database at all. For a single call per
 request like here, that distinction rarely matters; it matters more in
 code that calls `FindAsync` on the same ID multiple times within one
-request.
+request. See the Appendix for what that identity-map check actually
+does and where it bites.
 
 ---
 
@@ -734,3 +735,78 @@ or force client evaluation by materializing first
 (`.AsEnumerable().Where(t => IsUrgent(t))`) — which works but pulls
 every row into memory before filtering, defeating the point of
 filtering in the database at all.
+
+---
+
+## Appendix: what `FindAsync`'s identity-map check actually does
+
+§5 mentions that `FindAsync` checks whether an entity is already
+tracked before hitting the database — that's EF Core's **identity map**,
+and it's worth being precise about what it does and when it bites,
+because it behaves nothing like a Dapper/ADO.NET query re-run.
+
+**What `FindAsync` actually checks.** The `ChangeTracker` isn't just a
+list of "entities I've loaded" — internally it's keyed by `(entity
+type, primary key value)`. `FindAsync(id)` looks up that key in the
+tracker's internal dictionary *before* doing anything else. If an
+entity with that key is already tracked in this `DbContext` instance,
+it returns that exact same object reference immediately — zero SQL
+sent, no round trip to SQL Server at all. Only on a miss does it fall
+back to issuing `SELECT * FROM Tasks WHERE Id = @id` and registering
+the result.
+
+This is fundamentally different from `FirstOrDefaultAsync(t => t.Id ==
+id)`, which is a generic LINQ query — it has no concept of "have I
+already loaded this row," so it unconditionally sends a query to the
+database every single time, tracked or not. `Find`/`FindAsync` are the
+only APIs in EF Core with this short-circuit behavior; it's tied
+specifically to primary-key lookups.
+
+**Why a single call per request makes it invisible here.** `Update()`
+and `Delete()` in `TasksController` each call `FindAsync(id)` exactly
+once. On a fresh, scoped `DbContext` (one per HTTP request, per §2),
+the tracker starts empty, so that single call is always a cache miss —
+it always hits the database. The identity-map behavior exists, but it
+never has a second call in the same request to actually short-circuit
+against, so functionally it behaves indistinguishably from "just query
+by PK."
+
+**Where it would actually matter — a concrete scenario.** Imagine code
+(not in this repo, but plausible) that calls `FindAsync` twice in one
+request — say, an authorization check followed by the actual update
+logic:
+
+```csharp
+var existing = await db.Tasks.FindAsync(id);      // (1) SELECT sent, entity tracked
+if (existing is null) return NotFound();
+
+// ...some other logic...
+
+var task = await db.Tasks.FindAsync(id);           // (2) cache hit — no SQL at all
+task.Title = dto.Title;
+```
+
+Call (2) returns the *literal same object reference* as call (1) — not
+a fresh copy, not a fresh row read. Two consequences fall out of that,
+both surprising if you're used to Dapper/ADO.NET where every query is a
+fresh round trip returning a fresh object:
+
+1. **No second database hit**, even though the code reads as if it's
+   querying again. If you were watching SQL Server Profiler or EF's
+   logging, you'd see one `SELECT`, not two — which can be confusing
+   when you're trying to account for query counts.
+2. **You get back whatever's currently in memory, including uncommitted
+   mutations.** If something between calls (1) and (2) had already
+   mutated `existing.Title` without calling `SaveChangesAsync()` yet,
+   call (2)'s `task.Title` would reflect that *unsaved* in-memory
+   change, not what's actually persisted in `Tasks` right now.
+   `FindAsync` never re-reads from the database once an entity is
+   tracked — it trusts the tracker over the database.
+
+That second point is the real trap: `FindAsync` is not "get current DB
+state by key," it's "get the tracked instance for this key if one
+exists, otherwise get current DB state by key." Those are the same
+thing only on a cache miss. And because the identity map lives on the
+`DbContext` instance, and that instance is scoped per request (§2), the
+map's lifetime is bounded to a single request too — it never leaks
+stale entities across requests, only within one.
