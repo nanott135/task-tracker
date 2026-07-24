@@ -219,7 +219,9 @@ snapshot), never **model-vs-live-database**. That's exactly why
 in SQL Server Management Studio, the snapshot file has no idea that
 happened. The next `migrations add` will diff against the stale
 snapshot, not your actual schema, and generate a migration that's wrong
-relative to reality — EF has no way to detect the drift.
+relative to reality — EF has no way to detect the drift. See the
+Appendix for exactly when and how that drift actually surfaces as a
+failure.
 
 You verified this "no drift" state directly earlier in this project — the
 live `Tasks` table matched `TaskDbContextModelSnapshot.cs` and
@@ -578,3 +580,77 @@ endpoint in ASP.NET Core — you'll see it (or its minimal-API cousin
 and wants to both hand back the created representation *and* point the
 client at its canonical URL in one round trip, saving the client an
 immediate follow-up `GET`.
+
+---
+
+## Appendix: what actually happens when the model and the live database drift
+
+§3 states the rule — EF's migration diffing is model-vs-model, never
+model-vs-live-database — but it's worth tracing through concretely what
+happens if someone manually adds a column to `Tasks` in SQL Server
+Management Studio instead of going through `TaskItem.cs`. The honest
+answer is: **not a problem immediately, and that's exactly what makes it
+dangerous.** The failure is deferred to a specific, later point, not the
+moment the drift is introduced.
+
+**Step 1 — `dotnet ef migrations add SomeChangeName` never touches the
+live database at all.** It loads `TaskDbContextModelSnapshot.cs` (what
+the C# model looked like as of the last migration) and compares it
+against the *current* `TaskItem.cs`. There is no code path here that
+opens a connection to `TaskTrackerDb` and inspects `sys.columns` or
+anything like it. If the manually-added column has no corresponding C#
+property, this step cannot see it — not because it's failing to notice,
+but because the "database" side of the comparison is a frozen C#
+snapshot, not the real database.
+
+If nothing else changed in `TaskItem.cs`, this command produces a
+migration with **empty `Up()`/`Down()` bodies** — EF found zero
+differences between the model and the snapshot, so there's nothing to
+generate. No error, no warning about the manual column.
+
+**Step 2 — `dotnet ef database update` also doesn't diff against live
+schema.** Its only interaction with the database's actual shape is
+reading the `__EFMigrationsHistory` bookkeeping table to see which
+migration IDs are already recorded as applied, then running the `Up()`
+of whatever isn't. It executes SQL blindly based on what the migration
+file says to do — it doesn't first check "does this column already
+exist?" So in the empty-migration case above, this step just inserts a
+row into `__EFMigrationsHistory` and runs nothing. Still no conflict.
+The manual column and the untouched model now coexist indefinitely — EF
+never queries or writes that column, since no C# property maps to it.
+It's inert from EF's perspective, even though the data is still sitting
+there in SQL Server.
+
+**Where it actually breaks.** The failure is deferred until someone
+adds a C# property that happens to target the *same column name* the
+manual `ALTER TABLE` already created — for example, someone later
+notices the manual column and, unaware it already exists physically,
+adds `public string Notes { get; set; }` to `TaskItem` to "properly"
+model it, then runs `migrations add`. Now the model-vs-snapshot diff
+*does* see a difference (the snapshot has no `Notes`, the current model
+does) and generates a real `AddColumn` operation for it. `migrations
+add` still succeeds — it's still just an offline diff — but when
+`dotnet ef database update` runs, SQL Server executes the generated
+`ALTER TABLE [Tasks] ADD [Notes] nvarchar(max) NULL` against a table
+that **already has** a `Notes` column, and that fails hard, at apply
+time, with a raw SQL Server error along the lines of:
+
+```
+There is already an object named 'Notes' or the column names in table 'Tasks' are not unique.
+```
+
+The migration only partially applies (EF Core wraps each migration in a
+transaction by default for SQL Server, so it rolls back cleanly rather
+than leaving a half-applied schema), `__EFMigrationsHistory` doesn't get
+the new row, and you're stuck until you either drop the manual column,
+edit the generated migration to skip the `AddColumn` call, or otherwise
+reconcile the two by hand.
+
+**The broader point.** Vanilla EF Core CLI tooling has no built-in
+"verify live schema matches model" command at all — nothing analogous
+to `terraform plan` against real infrastructure. `Database.
+GetPendingMigrationsAsync()` and similar APIs only compare *migration
+history records*, not actual column-level schema. This class of bug is
+entirely on the humans (or automation) to avoid by disciplined use of
+`dotnet ef migrations add` for every schema change — which is precisely
+the rule `api/CLAUDE.md` states.
