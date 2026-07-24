@@ -335,7 +335,9 @@ can express your LINQ in T-SQL. This codebase's queries are simple
 enough (equality filters, direct property projection) that this never
 comes up, but it's the reason EF LINQ isn't "just C# that happens to
 run on a database" — it's closer to "a C#-shaped query language that
-gets recompiled to SQL, with a smaller surface than full C#."
+gets recompiled to SQL, with a smaller surface than full C#." See the
+Appendix for a concrete example of a method call that fails to
+translate, and why `Select(t => ToDto(t))` above is different.
 
 `FindAsync(id)` (used in `Update`/`Delete`) is a shortcut, not a LINQ
 query — it looks up by **primary key** specifically, and it first
@@ -654,3 +656,81 @@ history records*, not actual column-level schema. This class of bug is
 entirely on the humans (or automation) to avoid by disciplined use of
 `dotnet ef migrations add` for every schema change — which is precisely
 the rule `api/CLAUDE.md` states.
+
+---
+
+## Appendix: a concrete "could not be translated" failure
+
+§5 warns that not every C# expression can be translated to SQL, but the
+codebase's own example — `Select(t => ToDto(t))` in `GetAll()` — is
+itself a method call inside a query, which raises the obvious question:
+why does *that* one work?
+
+**Why `ToDto(t)` works.** `ToDto` is a single-expression method that
+does nothing but return `new TaskDto { Prop = task.Prop, ... }` — a
+member initializer built entirely from scalar properties of the
+parameter. EF Core's translator can inline that shape: it treats the
+call as equivalent to writing the object initializer directly in the
+`Select`, then translates each member access normally. This works
+specifically because the method body is *one expression*, with no
+branching and no calls to anything EF doesn't already know how to
+translate.
+
+**A concrete example that fails.** Add a helper with actual control
+flow — say, "is this task due soon":
+
+```csharp
+private static bool IsUrgent(TaskItem task)
+{
+    if (!task.DueDate.HasValue) return false;
+    var daysUntilDue = (task.DueDate.Value - DateTime.UtcNow).TotalDays;
+    return daysUntilDue is >= 0 and <= 2;
+}
+```
+
+and use it in a query:
+
+```csharp
+var urgent = await db.Tasks.AsNoTracking().Where(t => IsUrgent(t)).ToListAsync();
+```
+
+This throws at runtime, not compile time — `Where(Expression<Func<
+TaskItem, bool>>)` type-checks fine, since the compiler only needs
+`IsUrgent(t)` to be a valid method call returning `bool`. The failure
+only shows up when the query actually executes:
+
+```
+System.InvalidOperationException: The LINQ expression 'DbSet<TaskItem>()
+    .Where(t => IsUrgent(t))' could not be translated. Either rewrite
+the query in a form that can be translated, or switch to client
+evaluation explicitly by inserting a call to 'AsEnumerable', 'AsAsyncEnumerable',
+'ToList', or 'ToListAsync'. See https://go.microsoft.com/fwlink/?linkid=2101038
+for more information.
+```
+
+**Why this one can't be inlined where `ToDto` could.** `IsUrgent` has an
+`if` statement, an intermediate local variable, and a `return` inside a
+conditional block — it's not a single expression. There's no
+C#-to-SQL mapping for "branch and return early"; T-SQL has no
+equivalent of arbitrary imperative control flow inside a `WHERE`
+clause the way EF's translator understands it. Individual pieces like
+`DateTime.Subtract` and `.TotalDays` *are* individually translatable,
+but the method as a whole isn't a recognized BCL member or an EF
+`DbFunction`, so the translator has nothing to fall back to and gives
+up entirely — for the whole `Where`, not just the unrecognized part.
+
+**The fix** is to either inline the logic as pure LINQ so every piece is
+individually translatable:
+
+```csharp
+var urgent = await db.Tasks.AsNoTracking()
+    .Where(t => t.DueDate.HasValue
+             && t.DueDate.Value >= DateTime.UtcNow
+             && t.DueDate.Value <= DateTime.UtcNow.AddDays(2))
+    .ToListAsync();
+```
+
+or force client evaluation by materializing first
+(`.AsEnumerable().Where(t => IsUrgent(t))`) — which works but pulls
+every row into memory before filtering, defeating the point of
+filtering in the database at all.
