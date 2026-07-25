@@ -29,7 +29,7 @@ handling rather than outbound-request abuse.
 |---|---|---|
 | A01 | Broken Access Control (incl. SSRF) | ❌ Not covered |
 | A02 | Security Misconfiguration | ✅ Covered |
-| A03 | Software Supply Chain Failures | ❌ Not covered |
+| A03 | Software Supply Chain Failures | ✅ Covered |
 | A04 | Cryptographic Failures | ✅ Covered |
 | A05 | Injection | ✅ Covered |
 | A06 | Insecure Design | ⚠️ Partially covered |
@@ -126,53 +126,47 @@ unhandled error occurs — is discussed under A10 rather than here, since
 
 ## A03:2025 — Software Supply Chain Failures
 
-**Status: ❌ Not covered.**
+**Status: ✅ Covered.**
 
-This is a live finding, not a hypothetical one — running the scan
-directly against this repo surfaces it immediately:
+The concrete finding is fixed: `Microsoft.OpenApi` 2.0.0 was a
+**transitive** dependency (pulled in via `Microsoft.AspNetCore.OpenApi`
+10.0.9 in `TaskTracker.Api.csproj`) carrying a publicly disclosed
+**high-severity** advisory
+([GHSA-v5pm-xwqc-g5wc](https://github.com/advisories/GHSA-v5pm-xwqc-g5wc)
+/ CVE-2026-49451 — uncontrolled recursion parsing an OpenAPI document
+with a circular schema reference can crash the process via stack
+overflow). Both `TaskTracker.Api.csproj` and
+`TaskTracker.Api.Tests.csproj` now pin a direct `PackageReference` to
+`Microsoft.OpenApi` `2.7.6` (fixed at `2.7.5`+), overriding the
+vulnerable transitive resolution. Verified clean:
 
 ```
-$ dotnet list package --vulnerable --include-transitive
+$ dotnet list TaskTracker.slnx package --vulnerable --include-transitive
 
-Project `TaskTracker.Api` has the following vulnerable packages
-   [net10.0]:
-   Transitive Package       Resolved   Severity   Advisory URL
-   > Microsoft.OpenApi      2.0.0      High       https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
-
-Project `TaskTracker.Api.Tests` has the following vulnerable packages
-   [net10.0]:
-   Transitive Package       Resolved   Severity   Advisory URL
-   > Microsoft.OpenApi      2.0.0      High       https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+The given project `TaskTracker.Api` has no vulnerable packages given the current sources.
+The given project `TaskTracker.Api.Tests` has no vulnerable packages given the current sources.
 ```
 
-`Microsoft.OpenApi` 2.0.0 is a **transitive** dependency (pulled in via
-`Microsoft.AspNetCore.OpenApi` and/or
-`Swashbuckle.AspNetCore.SwaggerUI` in `TaskTracker.Api.csproj`) with a
-publicly disclosed **high-severity** advisory. Neither project pins a
-newer, patched version directly.
+The surrounding supply-chain posture is also strengthened, not just the
+one CVE:
 
-Beyond that one CVE, the surrounding supply-chain posture has no
-controls at all:
+- `RestorePackagesWithLockFile` is now enabled in both projects, and
+  the generated `packages.lock.json` files are committed — builds pin
+  to exact resolved versions (direct and transitive), so two builds a
+  week apart can't silently drift onto a different, possibly
+  vulnerable, dependency graph. Any future version bump shows up as a
+  reviewable diff in the lock file.
 
-- No `packages.lock.json` for either project — builds aren't pinned to
-  exact resolved versions, so two builds a week apart can silently
-  resolve different transitive dependency versions.
+Still absent, and out of scope for this fix:
+
 - No Dependabot config or equivalent (`.github/` doesn't exist in this
-  repo at all), so nothing automatically flags new advisories as they're
-  published.
+  repo at all), so nothing automatically flags the *next* advisory as
+  it's published.
 - No CI pipeline exists yet (no `.github/workflows`), so there's no
   automated `dotnet list package --vulnerable` gate on pull requests —
-  today, catching this requires someone to run the scan by hand, which
-  is exactly what surfaced the finding above.
-
-**To close this:** add a direct `PackageReference` for
-`Microsoft.OpenApi` at a patched version (check the advisory for the
-minimum fixed version) to both `TaskTracker.Api.csproj` and
-`TaskTracker.Api.Tests.csproj`, enable NuGet lock files
-(`RestorePackagesWithLockFile`) so resolved versions are reproducible
-and reviewable in diffs, and add a CI step that runs
-`dotnet list package --vulnerable --include-transitive` (or Dependabot)
-on every PR.
+  today, catching a new CVE still requires someone to run the scan by
+  hand, the way this one was found. Worth revisiting once a CI
+  pipeline exists at all for this repo.
 
 ---
 
