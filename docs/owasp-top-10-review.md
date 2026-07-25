@@ -30,7 +30,7 @@ handling rather than outbound-request abuse.
 | A01 | Broken Access Control (incl. SSRF) | ❌ Not covered |
 | A02 | Security Misconfiguration | ✅ Covered |
 | A03 | Software Supply Chain Failures | ❌ Not covered |
-| A04 | Cryptographic Failures | ⚠️ Partially covered |
+| A04 | Cryptographic Failures | ✅ Covered |
 | A05 | Injection | ✅ Covered |
 | A06 | Insecure Design | ⚠️ Partially covered |
 | A07 | Authentication Failures | ❌ Not covered |
@@ -178,9 +178,9 @@ on every PR.
 
 ## A04:2025 — Cryptographic Failures
 
-**Status: ⚠️ Partially covered.**
+**Status: ✅ Covered.**
 
-What's handled correctly:
+Handled correctly:
 
 - `app.UseHttpsRedirection()` (`Program.cs:35`) forces browser traffic
   onto TLS.
@@ -191,26 +191,35 @@ What's handled correctly:
 - Local dev auth to SQL Server uses Windows Integrated Auth
   (`Trusted_Connection=True`) — no password travels over the wire at
   all for the default setup.
+- `Program.cs` now adds `else { app.UseHsts(); }` alongside the existing
+  `if (app.Environment.IsDevelopment())` block, matching the standard
+  ASP.NET Core template. Verified two ways: `HstsTests.cs` confirms
+  `Strict-Transport-Security` is present on an HTTPS response under a
+  `Production`-environment test host and absent under `Development`;
+  and manually via `ASPNETCORE_ENVIRONMENT=Production dotnet run
+  --launch-profile https` + `curl -k -i https://localhost:7062/api/tasks`.
+- `appsettings.Development.json`'s `TrustServerCertificate=True` and
+  `appsettings.json`'s `AllowedHosts: "localhost"` (see A02) are both
+  documented in `api/CLAUDE.md` as dev-only settings that must be
+  updated together for a real deployment — not fixed in code here,
+  since there's nothing to fix in a setting that's correct for its
+  current gitignored/dev-only scope.
 
-What's not hardened:
-
-- The dev connection string sets `TrustServerCertificate=True`
-  (`appsettings.Development.json:9`), which disables TLS certificate
-  validation on the connection to SQL Server. That's a reasonable
-  concession for `localhost` during development, but it's the kind of
-  setting that quietly survives a copy-paste into a real deployment's
-  config, at which point it becomes a genuine MITM exposure on the
-  database connection.
-- `Program.cs` never calls `app.UseHsts()`. The standard ASP.NET Core
-  template adds this for non-Development environments
-  (`if (!app.Environment.IsDevelopment()) { app.UseHsts(); }`); this
-  project's `Program.cs` has no such branch at all, so even in a
-  hypothetical production run, clients are never told via
-  `Strict-Transport-Security` to refuse downgrading to plain HTTP on
-  subsequent visits.
-- No data in this app is sensitive enough to need encryption at rest
-  (task titles/descriptions, not secrets or PII), so that sub-concern
-  doesn't apply here.
+**A subtlety worth recording, found while verifying this fix:** ASP.NET
+Core's `HstsMiddleware` never adds the `Strict-Transport-Security`
+header for `localhost`/loopback requests, by design (so local
+development is never HSTS-pinned in a browser) — confirmed directly:
+`curl -k -i https://localhost:7062/api/tasks` in `Production` mode
+returns `200` with no HSTS header, even with `app.UseHsts()` wired up.
+Combined with `AllowedHosts: "localhost"` from A02 — which rejects any
+non-`localhost` `Host` header with `400` — this means HSTS cannot
+actually activate against this app *as currently deployed* (dev-only,
+`localhost`-scoped). The fix is still correct and necessary: it's the
+standard idiom, it's dormant only because every other setting in this
+app is also currently scoped to `localhost`, and it activates
+automatically the moment `AllowedHosts` is updated to a real hostname
+for an actual deployment — which is exactly the scenario `api/CLAUDE.md`
+now flags as something to update together.
 
 ---
 

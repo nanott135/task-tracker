@@ -31,6 +31,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "TaskTracker API v1"));
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 

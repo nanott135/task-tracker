@@ -6,6 +6,15 @@
   and `https://localhost:4200`).
 - Controllers return DTOs, never EF entities directly (avoids leaking tracking
   state / over-posting, keeps the wire contract stable if the entity changes).
+- Development connection strings may set `TrustServerCertificate=True` for
+  the local SQL Server instance — never carry that into a real deployment's
+  config; it disables TLS certificate validation on the database connection.
+- `AllowedHosts` (`appsettings.json`) is scoped to `"localhost"` for this
+  dev-only app. A real deployment needs to update it to the real hostname —
+  and note that ASP.NET Core's `UseHsts()` middleware never adds the
+  `Strict-Transport-Security` header for `localhost`/loopback requests by
+  design, so HSTS only actually takes effect once both settings move past
+  `localhost` together.
 
 ## How to run
 
