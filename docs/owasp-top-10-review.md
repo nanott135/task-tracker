@@ -28,7 +28,7 @@ handling rather than outbound-request abuse.
 | # | Category | Status |
 |---|---|---|
 | A01 | Broken Access Control (incl. SSRF) | ❌ Not covered |
-| A02 | Security Misconfiguration | ⚠️ Partially covered |
+| A02 | Security Misconfiguration | ✅ Covered |
 | A03 | Software Supply Chain Failures | ❌ Not covered |
 | A04 | Cryptographic Failures | ⚠️ Partially covered |
 | A05 | Injection | ✅ Covered |
@@ -84,7 +84,7 @@ both, not just writes.
 
 ## A02:2025 — Security Misconfiguration
 
-**Status: ⚠️ Partially covered.**
+**Status: ✅ Covered.**
 
 Handled well:
 
@@ -97,22 +97,26 @@ Handled well:
   the broad `.AllowAnyHeader().AllowAnyMethod()` on that policy doesn't
   combine with credentialed cross-origin requests, which is the
   genuinely dangerous combination.
-
-Left at framework defaults, unhardened:
-
-- `appsettings.json` sets `"AllowedHosts": "*"` — the stock template
-  value. This disables ASP.NET Core's `Host`-header validation
-  entirely, meaning the app will process a request carrying any `Host`
-  header. Low risk for a local Kestrel instance with no reverse proxy
-  in front of it today, but it's a default left as-is rather than
-  scoped down.
-- No security-header middleware anywhere (`X-Content-Type-Options`,
-  `Content-Security-Policy`, `Referrer-Policy`, etc.) — ASP.NET Core
-  doesn't add these by default, and nothing in this project adds them
-  either.
+- `appsettings.json` sets `"AllowedHosts": "localhost"` — scoped down
+  from the stock `"*"` template value. The app only ever runs on
+  `localhost` (`Properties/launchSettings.json`), so this rejects any
+  request carrying an unexpected `Host` header at no cost to
+  functionality.
+- Security-response-header middleware (`Program.cs`, right after
+  `app.UseHttpsRedirection()`) adds `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, and `Referrer-Policy: no-referrer` to every
+  response, verified live via `curl -i` and pinned by
+  `GetAll_ResponseIncludesSecurityHeaders` in
+  `TasksControllerTests.cs`. `Content-Security-Policy` is deliberately
+  omitted — this is a pure JSON API with no HTML views or
+  user-controlled static content, so a browser-document-rendering
+  control like CSP has no meaningful target here; worth adding only if
+  the API ever serves HTML directly.
 - `app.UseHttpsRedirection()` is present, but there's no `app.UseHsts()`
   for non-Development environments — see A04, where this is discussed
-  alongside the rest of the app's transport-security posture.
+  alongside the rest of the app's transport-security posture. (Kept as
+  an A04 finding rather than reopening this section, since it's
+  specifically a transport-security gap.)
 
 (General exception-handling configuration — what happens when an
 unhandled error occurs — is discussed under A10 rather than here, since

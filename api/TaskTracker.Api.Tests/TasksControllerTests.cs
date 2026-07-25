@@ -67,4 +67,14 @@ public class TasksControllerTests : IDisposable
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task GetAll_ResponseIncludesSecurityHeaders()
+    {
+        var response = await _client.GetAsync("/api/tasks");
+
+        Assert.True(response.Headers.Contains("X-Content-Type-Options"));
+        Assert.True(response.Headers.Contains("X-Frame-Options"));
+        Assert.True(response.Headers.Contains("Referrer-Policy"));
+    }
 }
